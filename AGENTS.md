@@ -26,6 +26,7 @@ shared/              Regras puras, sem I/O. Importadas pelo servidor E pelo app.
   status.ts          Estoque (ok/low/out), validade (ok/expiring/expired), tarja, duração
   schedule.ts        Estado da dose (pending/late/taken/skipped), quando o lembrete vence
   time.ts            Data/hora em um fuso IANA, minutos, diferença de dias
+  dosage.ts          Dosagem: medidas aceitas (mg, g, mL…), formatDosage / parseDosage
   format.ts          Textos pt-BR: quantidades, validade, dias da semana, motivos de atenção
   validate.ts        parseMedicineInput / parseSettings (usados na API e no formulário)
 
@@ -84,6 +85,8 @@ scripts/             generate-icons.mjs, build-edge.mjs, serve-pages.mjs (Pages 
 - **Estado de um remédio** nunca é guardado: é calculado por `healthOf(medicine, hoje, antecedência)`
   em `shared/status.ts`, tanto no app quanto no agendador.
 - **Validade** é `AAAA-MM` (como na caixa) e vale até o último dia do mês.
+- **Dosagem** é um texto, mas sempre no formato de `formatDosage` ("500 mg", "0,9%"): a API
+  recusa o que `parseDosage` não entende, e o formulário edita número e medida separados.
 - **Doses**: um `Schedule` é "horário + dias da semana + dose". Registrar uma dose cria uma
   linha em `intakes` (única por horário e dia) e desconta do estoque; `amount` guarda o
   que saiu de fato para o "desfazer" devolver o valor certo.

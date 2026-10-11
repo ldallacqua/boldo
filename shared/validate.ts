@@ -1,3 +1,4 @@
+import { formatDosage, parseDosage } from './dosage';
 import { isValidExpiry } from './status';
 import { isValidTime } from './time';
 import {
@@ -46,12 +47,21 @@ export function parseMedicineInput(raw: unknown): Result<MedicineInput> {
   const name = text(m.name, 120);
   if (!name) return { ok: false, error: 'Informe o nome do remédio.' };
 
-  const dosage = text(m.dosage, 80);
   const purpose = text(m.purpose, 240);
   const notes = text(m.notes, 4000);
-  if (dosage === null || purpose === null || notes === null) {
+  if (purpose === null || notes === null) {
     return { ok: false, error: 'Um dos textos é longo demais.' };
   }
+
+  const dosageText = text(m.dosage, 40);
+  const parsedDosage = dosageText ? parseDosage(dosageText) : null;
+  if (dosageText !== '' && !parsedDosage) {
+    return {
+      ok: false,
+      error: 'Dosagem inválida. Informe um número maior que zero e a medida, como 500 mg.',
+    };
+  }
+  const dosage = parsedDosage ? formatDosage(parsedDosage) : '';
 
   const unit = (m.unit ?? 'comprimido') as UnitKey;
   if (!UNIT_KEYS.includes(unit)) return { ok: false, error: 'Unidade desconhecida.' };

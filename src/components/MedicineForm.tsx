@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { DOSAGE_UNITS, formatDosage, parseDosage, type DosageUnit } from '../../shared/dosage';
 import {
   ALL_DAYS,
   UNIT_KEYS,
@@ -24,7 +25,8 @@ interface ScheduleDraft {
 
 interface Draft {
   name: string;
-  dosage: string;
+  dosageAmount: string;
+  dosageUnit: DosageUnit;
   purpose: string;
   unit: UnitKey;
   quantity: string;
@@ -43,9 +45,11 @@ const newKey = () => `novo-${(nextKey += 1)}`;
 
 function toDraft(medicine: Medicine | null): Draft {
   const [year = '', month = ''] = medicine?.expiresOn?.split('-') ?? [];
+  const dosage = medicine ? parseDosage(medicine.dosage) : null;
   return {
     name: medicine?.name ?? '',
-    dosage: medicine?.dosage ?? '',
+    dosageAmount: dosage ? String(dosage.amount) : '',
+    dosageUnit: dosage?.unit ?? 'mg',
     purpose: medicine?.purpose ?? '',
     unit: medicine?.unit ?? 'comprimido',
     quantity: medicine ? String(medicine.quantity) : '',
@@ -69,7 +73,10 @@ const toNumber = (value: string) => (value.trim() === '' ? 0 : Number(value.repl
 function toInput(draft: Draft): MedicineInput {
   return {
     name: draft.name,
-    dosage: draft.dosage,
+    dosage:
+      draft.dosageAmount.trim() === ''
+        ? ''
+        : formatDosage({ amount: toNumber(draft.dosageAmount), unit: draft.dosageUnit }),
     purpose: draft.purpose,
     unit: draft.unit,
     quantity: toNumber(draft.quantity),
@@ -149,16 +156,33 @@ export function MedicineForm({ medicine, onSaved, onCancel }: MedicineFormProps)
         />
       </div>
 
-      <div className="campo">
-        <label htmlFor="dosagem">Dosagem</label>
-        <input
-          id="dosagem"
-          value={draft.dosage}
-          onChange={(e) => set('dosage', e.target.value)}
-          placeholder="500 mg"
-          autoComplete="off"
-        />
-      </div>
+      <fieldset className="campo">
+        <legend>Dosagem</legend>
+        <div className="campos-lado">
+          <input
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="any"
+            aria-label="Valor da dosagem"
+            value={draft.dosageAmount}
+            onChange={(e) => set('dosageAmount', e.target.value)}
+            placeholder="500"
+          />
+          <select
+            aria-label="Medida da dosagem"
+            value={draft.dosageUnit}
+            onChange={(e) => set('dosageUnit', e.target.value as DosageUnit)}
+          >
+            {DOSAGE_UNITS.map((unit) => (
+              <option key={unit} value={unit}>
+                {unit}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="ajuda">Como está na caixa. Deixe o número em branco se não houver.</p>
+      </fieldset>
 
       <div className="campo">
         <label htmlFor="serve">Pra que serve</label>

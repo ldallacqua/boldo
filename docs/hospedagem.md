@@ -75,10 +75,19 @@ enviados naquele minuto).
 
 ## Limites do plano gratuito que importam
 
-- **Pausa por inatividade**: o Supabase pausa projetos gratuitos sem uso por cerca de uma
-  semana. O cron do Boldo chama a API a cada minuto, o que conta como uso, mas se o projeto
-  for pausado mesmo assim o app mostra "Não deu para carregar": é só reativar no painel
-  (Restore project). Os dados ficam guardados.
+- **Pausa por inatividade**: o Supabase pausa projetos gratuitos que passam uma semana sem
+  "atividade de usuário no banco", e não publica a regra exata. Duas coisas mantêm o Boldo
+  ativo mesmo sem ninguém abrir o app:
+  - o cron do banco chama a API a cada minuto, e cada chamada lê e grava no banco;
+  - o workflow `.github/workflows/keepalive.yml` chama `GET /api/health` (que consulta o
+    banco) de fora do Supabase uma vez por dia. Se o projeto estiver pausado, o workflow
+    falha e o GitHub avisa por e-mail.
+
+  Se for pausado mesmo assim, o app mostra "Não deu para carregar": é só reativar no painel
+  (Restore project). Os dados ficam guardados. Atenção: o GitHub desliga workflows
+  agendados de repositórios sem nenhum commit há 60 dias (avisa por e-mail antes; reativa-se
+  na aba Actions).
+
 - **Chamadas**: o cron faz cerca de 43 mil chamadas por mês; o plano gratuito inclui 500 mil.
 - **Primeira chamada lenta**: depois de alguns minutos parada, a função leva 1 a 2 segundos
   para acordar.

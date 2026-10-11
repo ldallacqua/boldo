@@ -170,6 +170,11 @@ export class Store {
   }
 
   /** Apaga todos os dados. Só para testes. */
+  /** Uma consulta mínima, para `GET /api/health` dizer se o banco responde. */
+  async ping(): Promise<void> {
+    await this.db.query('SELECT 1');
+  }
+
   async reset(): Promise<void> {
     const tables = TABLES.map((table) => `boldo.${table}`).join(', ');
     await this.db.exec(`TRUNCATE ${tables} RESTART IDENTITY CASCADE`);

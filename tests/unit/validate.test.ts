@@ -81,6 +81,19 @@ describe('parseMedicineInput', () => {
     expect(withSchedule({ time: '08:00', days: [1], dose: 0 })).toMatch(/horário/);
   });
 
+  it('guarda a dosagem no formato da caixa e recusa o que não é número com medida', () => {
+    const dosageOf = (dosage: unknown) => {
+      const result = parseMedicineInput({ ...valid, dosage });
+      return result.ok ? result.value.dosage : null;
+    };
+    expect(dosageOf('2000ui')).toBe('2.000 UI');
+    expect(dosageOf('0.9 %')).toBe('0,9%');
+    expect(dosageOf('  ')).toBe('');
+    expect(error({ ...valid, dosage: 'forte' })).toMatch(/Dosagem inválida/);
+    expect(error({ ...valid, dosage: '500 colheres' })).toMatch(/Dosagem inválida/);
+    expect(error({ ...valid, dosage: 500 })).toMatch(/Dosagem inválida/);
+  });
+
   it('recusa textos longos demais', () => {
     expect(error({ ...valid, notes: 'x'.repeat(4001) })).toMatch(/longo/);
   });

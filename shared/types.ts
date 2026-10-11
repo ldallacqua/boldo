@@ -31,7 +31,7 @@ export interface Schedule {
 export interface Medicine {
   id: number;
   name: string;
-  /** Concentração/apresentação, texto livre: "500 mg", "20 mg/mL". */
+  /** Número e medida, no formato de `formatDosage`: "500 mg", "20 mg/mL". Vazio se não há. */
   dosage: string;
   purpose: string;
   unit: UnitKey;

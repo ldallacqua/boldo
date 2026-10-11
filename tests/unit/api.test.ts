@@ -16,7 +16,7 @@ describe('sessão', () => {
     }
   });
 
-  it('saúde e sessão respondem sem senha', async () => {
+  it('saúde (que consulta o banco) e sessão respondem sem senha', async () => {
     expect((await t.call('GET', '/api/health')).body).toEqual({ ok: true });
     expect((await t.call('GET', '/api/session')).body).toEqual({ authenticated: false });
   });

@@ -15,10 +15,11 @@ test('cadastra um remédio completo e mostra na lista e nos detalhes', async ({ 
   await expect(sheet.getByRole('heading', { name: 'Novo remédio' })).toBeVisible();
 
   await sheet.getByLabel('Nome', { exact: true }).fill(name);
-  await sheet.getByLabel('Dosagem').fill('500 mg');
+  await sheet.getByLabel('Valor da dosagem').fill('0.5');
+  await sheet.getByLabel('Medida da dosagem').selectOption('g');
   await sheet.getByLabel('Pra que serve').fill('Dor e febre');
   await sheet.getByLabel('Quantidade em casa').fill('20');
-  await sheet.getByLabel('Unidade').selectOption('capsula');
+  await sheet.getByLabel('Unidade', { exact: true }).selectOption('capsula');
   await sheet.getByLabel('Avisar quando restar').fill('5');
   await sheet.getByLabel('Mês da validade').selectOption('08');
   await sheet.getByLabel('Ano da validade').selectOption(year);
@@ -27,7 +28,7 @@ test('cadastra um remédio completo e mostra na lista e nos detalhes', async ({ 
 
   await expect(page.getByRole('status')).toHaveText('Remédio salvo');
   await expect(sheet.getByRole('heading', { name })).toBeVisible();
-  await expect(sheet).toContainText('500 mg');
+  await expect(sheet).toContainText('0,5 g');
   await expect(sheet).toContainText('Dor e febre');
   await expect(sheet.getByTestId('quantidade')).toHaveText('20');
   await expect(sheet).toContainText('cápsulas em casa');
@@ -48,6 +49,11 @@ test('não salva sem nome e diz o que falta', async ({ page }) => {
   await sheet.getByLabel('Quantidade em casa').fill('3');
   await sheet.getByRole('button', { name: 'Salvar remédio' }).click();
   await expect(sheet.getByRole('alert')).toHaveText('Informe o nome do remédio.');
+
+  await sheet.getByLabel('Nome', { exact: true }).fill('Sem dosagem válida');
+  await sheet.getByLabel('Valor da dosagem').fill('0');
+  await sheet.getByRole('button', { name: 'Salvar remédio' }).click();
+  await expect(sheet.getByRole('alert')).toContainText('Dosagem inválida');
   await expect(page).toHaveURL(/\/remedios\/novo$/);
 });
 
@@ -80,13 +86,23 @@ test('ajusta a quantidade com os botões de mais e menos', async ({ page }, info
 });
 
 test('edita um remédio, incluindo os horários', async ({ page }, info) => {
-  const medicine = await createMedicine(page, { name: unique(info, 'Omeprazol'), quantity: 14 });
+  const medicine = await createMedicine(page, {
+    name: unique(info, 'Omeprazol'),
+    dosage: '2.000 UI',
+    quantity: 14,
+  });
   const renamed = `${medicine.name} editado`;
 
   await page.goto(`/remedios/${medicine.id}`);
   const sheet = page.getByRole('dialog');
   await expect(sheet).toContainText('Sem lembrete de horário');
   await sheet.getByRole('link', { name: 'Editar' }).click();
+
+  // A dosagem guardada volta separada em número e medida.
+  await expect(sheet.getByLabel('Valor da dosagem')).toHaveValue('2000');
+  await expect(sheet.getByLabel('Medida da dosagem')).toHaveValue('UI');
+  await sheet.getByLabel('Valor da dosagem').fill('20');
+  await sheet.getByLabel('Medida da dosagem').selectOption('mg/mL');
 
   await sheet.getByLabel('Nome', { exact: true }).fill(renamed);
   await sheet.getByLabel('Anotações').fill('Em jejum.');
@@ -100,6 +116,7 @@ test('edita um remédio, incluindo os horários', async ({ page }, info) => {
   await sheet.getByRole('button', { name: 'Salvar remédio' }).click();
 
   await expect(sheet.getByRole('heading', { name: renamed })).toBeVisible();
+  await expect(sheet).toContainText('20 mg/mL');
   await expect(sheet).toContainText('Em jejum.');
   await expect(sheet).toContainText('07:15');
   await expect(sheet).toContainText('2 comprimidos, seg a sex');

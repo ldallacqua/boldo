@@ -1,0 +1,21 @@
+name: Manter o Supabase ativo
+
+# O Supabase pausa projetos gratuitos que passam uma semana sem atividade. O cron do banco já
+# chama a API a cada minuto; esta chamada diária vem de fora e, se o projeto estiver pausado,
+# falha, e o GitHub avisa por e-mail.
+on:
+  schedule:
+    - cron: '17 9 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    name: Chama a API, que consulta o banco
+    if: vars.BOLDO_API_BASE != ''
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          API_BASE: ${{ vars.BOLDO_API_BASE }}
+        run: curl --fail --silent --show-error --retry 3 --retry-delay 20 --max-time 30 "$API_BASE/api/health"

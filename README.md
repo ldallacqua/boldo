@@ -18,8 +18,8 @@ Supabase; veja [docs/hospedagem.md](docs/hospedagem.md)).
 
 ## O que ele faz
 
-- **Remédios**: nome, dosagem, para que serve, quantidade, unidade (comprimidos, cápsulas,
-  mL, gotas…), validade e anotações livres.
+- **Remédios**: nome, dosagem (número e medida: mg, g, mcg, mL, UI, %…), para que serve,
+  quantidade, unidade (comprimidos, cápsulas, mL, gotas…), validade e anotações livres.
 - **Estoque**: botões de mais e menos para ajustar na hora. Quando há horários cadastrados,
   mostra para quantos dias o estoque dá.
 - **Hoje**: as doses do dia em ordem de horário. "Tomei" registra a dose e já desconta do

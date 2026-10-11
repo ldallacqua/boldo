@@ -94,7 +94,10 @@ export function createApp(options: AppOptions): Hono {
 
   // ── Sem sessão ─────────────────────────────────────────────────────────
 
-  app.get('/api/health', (c) => c.json({ ok: true }));
+  app.get('/api/health', async (c) => {
+    await store.ping();
+    return c.json({ ok: true });
+  });
 
   app.get('/api/session', (c) => c.json({ authenticated: isAuthenticated(c) }));
 
