@@ -40,6 +40,8 @@ describe('lembretes de dose', () => {
   it('avisa na hora, com o que tomar e os dados para o botão "Tomei"', async () => {
     const medicine = await losartana();
     await tick('08:00');
+    // O remédio acompanha o aviso, para o envio pular os aparelhos que o silenciaram.
+    expect(sender.medicineIds).toEqual([medicine.id]);
     expect(sender.sent).toEqual([
       {
         title: 'Hora de tomar Losartana',

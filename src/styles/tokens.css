@@ -29,6 +29,14 @@
   --vermelho-texto: #96301f;
   --vermelho-fundo: #f3d8cd;
 
+  --tinta-fraca: #7d8a80;
+  --veu: rgb(23 39 29 / 0.5);
+
+  /* A lateral das telas largas é sempre escura, nos dois temas. */
+  --nav-fundo: #1c3829;
+  --nav-texto: #f3ecd9;
+  --nav-texto-suave: #b9c9b3;
+
   /* Tipos */
   --fonte-titulo: 'Bricolage Grotesque Variable', 'Arial Narrow', system-ui, sans-serif;
   --fonte-texto: 'Instrument Sans Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -63,4 +71,37 @@
   --nav-altura: 64px;
   --trilho: 88px;
   --lateral: 256px;
+}
+
+/*
+ * Tema escuro: as mesmas funções, com papel escuro e verdes claros. `data-theme` é posto no
+ * <html> por src/lib/theme.ts (escolha do aparelho, ou a preferência do sistema).
+ */
+:root[data-theme='dark'] {
+  --creme: #111814;
+  --papel: #18211c;
+  --papel-alto: #1f2a24;
+  --linha: #2b382f;
+  --linha-forte: #46584b;
+
+  --tinta: #ece6d3;
+  --tinta-suave: #a5b3a8;
+  --tinta-fraca: #7f8d83;
+  --veu: rgb(0 0 0 / 0.62);
+
+  --boldo: #dfe9d5;
+  --folha: #7cc194;
+  --folha-escura: #97d2ab;
+  --salvia: #2e4a39;
+  --salvia-clara: #22352a;
+
+  --mostarda: #dfab43;
+  --mostarda-texto: #f1d18a;
+  --mostarda-fundo: #3d310f;
+  --vermelho: #e27b67;
+  --vermelho-texto: #f4aa9b;
+  --vermelho-fundo: #45211a;
+
+  --nav-fundo: #0b110d;
+  --sombra-folha: 0 18px 50px -12px rgb(0 0 0 / 0.6);
 }

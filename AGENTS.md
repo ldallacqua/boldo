@@ -117,6 +117,10 @@ Supabase) e pode rodar quantas vezes for, até em paralelo, sem repetir aviso:
   **sobe**; quando desce (repôs, corrigiu a validade), rearma na hora. Só saem entre
   `alertTime` (Ajustes) e 21:00. A troca de estágio é um compare-and-swap
   (`advanceAlertStages`): só quem grava envia.
+- **Por aparelho**: cada inscrição de push guarda os remédios que silenciou
+  (`muted_medicines`). O agendador entrega o id do remédio junto com o aviso
+  (`sender.send(payload, medicineId)`) e o envio pula os aparelhos que o silenciaram; vale
+  para dose, estoque e validade. O estágio de estoque/validade é da casa, não do aparelho.
 - O navegador recebe o push em `src/sw.ts`; o que a notificação mostra e o que o clique faz
   está em `src/lib/notifications.ts` (testado em `tests/unit/notifications.test.ts`).
 
@@ -145,6 +149,10 @@ usa relógio falso (`at('08:00')`) e um `sender` que só grava o que seria envia
 ## Design
 
 Paleta creme e verde, definida em `src/styles/tokens.css`. Não use cores fora dos tokens.
+O tema escuro redefine os mesmos tokens em `:root[data-theme='dark']`; quem põe o atributo é
+`src/lib/theme.ts` (escolha guardada no aparelho, ou a preferência do sistema). `--boldo` é
+"a tinta de destaque" e `--creme` "o fundo da página", então trocam de papel no escuro; a
+lateral usa `--nav-*`, que fica escura nos dois temas. O E2E mede o contraste no escuro.
 
 - **A tarja** (faixa colorida, como nas caixas de remédio) é o único elemento que carrega
   cor de estado: verde em ordem, mostarda atenção, vermelha acabou/venceu. Aparece na

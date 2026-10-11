@@ -212,7 +212,9 @@ describe('ajustes e notificações', () => {
     const subscription = { endpoint: 'https://push.example/1', p256dh: 'a', auth: 'b' };
     await store.saveSubscription(subscription, NOW);
     await store.saveSubscription({ ...subscription, auth: 'c' }, NOW);
-    expect(await store.listSubscriptions()).toEqual([{ ...subscription, auth: 'c' }]);
+    expect(await store.listSubscriptions()).toEqual([
+      { ...subscription, auth: 'c', mutedMedicines: [] },
+    ]);
     await store.deleteSubscription(subscription.endpoint);
     expect(await store.countSubscriptions()).toBe(0);
   });
@@ -257,12 +259,15 @@ describe('tentativas de senha', () => {
 });
 
 describe('banco criado por uma versão anterior', () => {
-  it('transforma o texto de "pra que serve" em tags, sem perder os remédios', async () => {
+  it('transforma "pra que serve" em tags e mantém remédios e aparelhos inscritos', async () => {
     const db = await openPglite();
     const old = new Store(db);
     await old.init();
-    // Volta a tabela ao formato de antes das tags.
+    // Volta as tabelas ao formato de antes das tags e do silenciar por aparelho.
     await db.exec(`
+      ALTER TABLE boldo.push_subscriptions DROP COLUMN muted_medicines;
+      INSERT INTO boldo.push_subscriptions (endpoint, p256dh, auth, created_at)
+        VALUES ('https://push.example/antigo', 'a', 'b', '${NOW}');
       ALTER TABLE boldo.medicines DROP COLUMN tags;
       ALTER TABLE boldo.medicines ADD COLUMN purpose text NOT NULL DEFAULT '';
       INSERT INTO boldo.medicines (name, purpose, created_at, updated_at) VALUES
@@ -276,6 +281,10 @@ describe('banco criado por uma versão anterior', () => {
     expect(medicines.map((m) => [m.name, m.tags])).toEqual([
       ['Dipirona', ['Dor', 'Febre']],
       ['Soro', []],
+    ]);
+
+    expect(await migrated.listSubscriptions()).toEqual([
+      { endpoint: 'https://push.example/antigo', p256dh: 'a', auth: 'b', mutedMedicines: [] },
     ]);
 
     // Subir de novo não muda nada, e o banco aceita remédios novos.

@@ -88,4 +88,8 @@ export const api = {
   unsubscribePush: (endpoint: string) =>
     request<{ devices: number }>('/api/push/unsubscribe', 'POST', { endpoint }),
   testPush: () => request<{ delivered: number }>('/api/push/test', 'POST'),
+  getDevice: (endpoint: string) =>
+    request<{ mutedMedicines: number[] }>('/api/push/device', 'POST', { endpoint }),
+  saveDevice: (endpoint: string, mutedMedicines: number[]) =>
+    request<{ mutedMedicines: number[] }>('/api/push/device', 'PUT', { endpoint, mutedMedicines }),
 };

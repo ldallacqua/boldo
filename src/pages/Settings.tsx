@@ -9,15 +9,17 @@ import { promptInstall, useCanInstall } from '../lib/install';
 import {
   disablePush,
   enablePush,
+  getPushEndpoint,
   getPushState,
   isIos,
   isStandalone,
   type PushState,
 } from '../lib/push';
-import { useSaveSettings, useSettings } from '../lib/queries';
+import { useMedicines, useSaveSettings, useSettings } from '../lib/queries';
+import { getThemeChoice, setThemeChoice, type ThemeChoice } from '../lib/theme';
 
 const PUSH_TEXT: Record<PushState, string> = {
-  on: 'Este aparelho recebe os lembretes de dose e os avisos de estoque e validade.',
+  on: 'Este aparelho recebe os lembretes de dose e os avisos de estoque e validade dos remédios marcados abaixo.',
   off: 'Este aparelho ainda não recebe lembretes.',
   denied:
     'As notificações estão bloqueadas para este site. Libere nas configurações do navegador e volte aqui.',
@@ -26,6 +28,105 @@ const PUSH_TEXT: Record<PushState, string> = {
   unsupported:
     'Este navegador não tem suporte a notificações. Use Chrome, Edge, Firefox ou Safari.',
 };
+
+/**
+ * A farmacinha é da casa, mas cada pessoa só quer ser avisada do que é dela: aqui o aparelho
+ * escolhe de quais remédios recebe lembrete de dose e aviso de estoque e validade.
+ */
+function DeviceMedicines() {
+  const medicines = useMedicines();
+  const toast = useToast();
+  const [endpoint, setEndpoint] = useState<string | null>(null);
+  const [muted, setMuted] = useState<number[] | null>(null);
+
+  useEffect(() => {
+    let current = true;
+    (async () => {
+      const found = await getPushEndpoint();
+      if (!found) return;
+      const device = await api.getDevice(found);
+      if (!current) return;
+      setEndpoint(found);
+      setMuted(device.mutedMedicines);
+    })().catch(() => undefined);
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  if (!endpoint || !muted || !medicines.data) return null;
+  if (medicines.data.length === 0) return null;
+
+  const toggle = async (id: number, notify: boolean) => {
+    const before = muted;
+    const next = notify ? muted.filter((other) => other !== id) : [...muted, id];
+    setMuted(next);
+    try {
+      setMuted((await api.saveDevice(endpoint, next)).mutedMedicines);
+    } catch (error) {
+      setMuted(before);
+      toast((error as Error).message, 'error');
+    }
+  };
+
+  return (
+    <fieldset className="campo">
+      <legend>Avisar neste aparelho sobre</legend>
+      <div className="avisados">
+        {medicines.data.map((medicine) => (
+          <label key={medicine.id} className="avisado">
+            <input
+              type="checkbox"
+              checked={!muted.includes(medicine.id)}
+              onChange={(e) => toggle(medicine.id, e.target.checked)}
+            />
+            <span className="avisado-nome">
+              {medicine.name}
+              {medicine.dosage && <span>{medicine.dosage}</span>}
+            </span>
+          </label>
+        ))}
+      </div>
+      <p className="ajuda">
+        Desmarque os remédios de outra pessoa da casa. Vale só para este aparelho; os outros
+        continuam recebendo. Remédios novos já entram marcados.
+      </p>
+    </fieldset>
+  );
+}
+
+function Appearance() {
+  const [choice, setChoice] = useState<ThemeChoice>(getThemeChoice);
+  const options: [ThemeChoice, string][] = [
+    ['auto', 'Como o aparelho'],
+    ['claro', 'Claro'],
+    ['escuro', 'Escuro'],
+  ];
+  return (
+    <section className="bloco" aria-labelledby="aparencia-titulo">
+      <h2 id="aparencia-titulo">Aparência</h2>
+      <fieldset className="opcoes">
+        <legend className="so-leitor">Tema</legend>
+        {options.map(([value, label]) => (
+          <label key={value} className="opcao">
+            <input
+              type="radio"
+              name="tema"
+              value={value}
+              checked={choice === value}
+              onChange={() => {
+                setChoice(value);
+                setThemeChoice(value);
+              }}
+            />
+            {label}
+          </label>
+        ))}
+      </fieldset>
+      <p className="ajuda">Vale só para este aparelho.</p>
+    </section>
+  );
+}
 
 function Reminders({ vapidPublicKey, devices }: { vapidPublicKey: string; devices: number }) {
   const [state, setState] = useState<PushState | null>(null);
@@ -108,6 +209,7 @@ function Reminders({ vapidPublicKey, devices }: { vapidPublicKey: string; device
           </>
         )}
       </div>
+      {state === 'on' && <DeviceMedicines />}
       <p className="ajuda">
         {devices === 0
           ? 'Nenhum aparelho recebe lembretes por enquanto.'
@@ -278,6 +380,7 @@ export function Settings() {
           alertTime={settings.data.alertTime}
           timezone={settings.data.timezone}
         />
+        <Appearance />
         <Install />
         <section className="bloco" aria-labelledby="dados-titulo">
           <h2 id="dados-titulo">Seus dados</h2>

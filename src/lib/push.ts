@@ -37,6 +37,12 @@ export async function getPushState(): Promise<PushState> {
   return subscription ? 'on' : 'off';
 }
 
+/** O endereço da inscrição deste aparelho: é por ele que o servidor o reconhece. */
+export async function getPushEndpoint(): Promise<string | null> {
+  const registration = await navigator.serviceWorker.getRegistration();
+  return (await registration?.pushManager.getSubscription())?.endpoint ?? null;
+}
+
 function keyToBytes(base64url: string): Uint8Array<ArrayBuffer> {
   const base64 = (base64url + '='.repeat((4 - (base64url.length % 4)) % 4))
     .replace(/-/g, '+')

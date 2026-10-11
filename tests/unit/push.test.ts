@@ -217,6 +217,19 @@ describe('envio', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('pula o aparelho que silenciou o remédio do aviso', async () => {
+    const { store, browser, fetchMock, sender } = await setup(
+      async () => new Response(null, { status: 201 }),
+    );
+    await store.setMutedMedicines(browser.subscription.endpoint, [7]);
+
+    expect(await sender.send(payload, 7)).toBe(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+    // Outro remédio, e avisos que não são de remédio nenhum (o teste), continuam chegando.
+    expect(await sender.send(payload, 8)).toBe(1);
+    expect(await sender.send(payload)).toBe(1);
+  });
+
   it('manda a mensagem cifrada, com os cabeçalhos do padrão, e o aparelho consegue ler', async () => {
     const { browser, fetchMock, sender } = await setup(
       async () => new Response(null, { status: 201 }),

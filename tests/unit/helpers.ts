@@ -39,12 +39,15 @@ export async function memoryStore(): Promise<Store> {
   return store;
 }
 
-export function fakeSender(): PushSender & { sent: PushPayload[] } {
+export function fakeSender(): PushSender & { sent: PushPayload[]; medicineIds: unknown[] } {
   const sent: PushPayload[] = [];
+  const medicineIds: unknown[] = [];
   return {
     sent,
-    async send(payload) {
+    medicineIds,
+    async send(payload, medicineId) {
       sent.push(payload);
+      medicineIds.push(medicineId);
       return 1;
     },
   };

@@ -93,7 +93,7 @@ export async function runTick(
   const nowIso = instant.toISOString();
   const settings = await store.getSettings();
   const medicines = await store.listMedicines();
-  const outbox: PushPayload[] = [];
+  const outbox: { payload: PushPayload; medicineId: number }[] = [];
 
   const intakes = await store.listIntakes(now.date);
   const recorded = new Set(intakes.map((intake) => intake.schedule_id));
@@ -102,7 +102,10 @@ export async function runTick(
       if (!isReminderDue(schedule, now) || recorded.has(schedule.id)) continue;
       if (await store.claimNotification(`dose:${schedule.id}:${now.date}`, nowIso)) {
         const token = tokens.dose(schedule.id, now.date);
-        outbox.push(doseReminder(medicine, schedule.id, now.date, token));
+        outbox.push({
+          payload: doseReminder(medicine, schedule.id, now.date, token),
+          medicineId: medicine.id,
+        });
       }
     }
   }
@@ -135,13 +138,15 @@ export async function runTick(
 
     if (next.stockStage === sent.stockStage && next.expiryStage === sent.expiryStage) continue;
     // Só envia quem conseguiu gravar o novo estágio; outra passada simultânea fica de fora.
-    if (await store.advanceAlertStages(medicine.id, sent, next)) outbox.push(...alerts);
+    if (await store.advanceAlertStages(medicine.id, sent, next)) {
+      outbox.push(...alerts.map((payload) => ({ payload, medicineId: medicine.id })));
+    }
   }
 
   await store.pruneNotificationLog(new Date(instant.getTime() - LOG_RETENTION_MS).toISOString());
 
-  for (const payload of outbox) await sender.send(payload);
-  return outbox;
+  for (const { payload, medicineId } of outbox) await sender.send(payload, medicineId);
+  return outbox.map(({ payload }) => payload);
 }
 
 /** No servidor Node, o próprio processo marca o tempo. Na hospedagem, é o cron do banco. */

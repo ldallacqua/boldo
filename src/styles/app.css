@@ -24,7 +24,7 @@
   align-items: center;
   gap: var(--e-3);
   text-decoration: none;
-  color: var(--creme);
+  color: var(--nav-texto);
 }
 
 .nav-nome {
@@ -89,7 +89,7 @@
     width: var(--trilho);
     padding: var(--e-5) 0;
     border: 0;
-    background: var(--boldo);
+    background: var(--nav-fundo);
   }
 
   .nav-marca {
@@ -112,12 +112,12 @@
     height: auto;
     padding: var(--e-3) 0;
     gap: var(--e-1);
-    color: #b9c9b3;
+    color: var(--nav-texto-suave);
   }
 
   .nav-item:hover,
   .nav-item[aria-current='page'] {
-    color: var(--creme);
+    color: var(--nav-texto);
   }
 
   .nav-item[aria-current='page']::before {
@@ -127,11 +127,11 @@
     height: 36px;
     translate: 0 -50%;
     border-radius: 0 4px 4px 0;
-    background: var(--creme);
+    background: var(--nav-texto);
   }
 
   .nav :focus-visible {
-    outline-color: var(--creme);
+    outline-color: var(--nav-texto);
     outline-offset: -4px;
   }
 }
@@ -674,7 +674,7 @@
 .busca input::placeholder,
 .campo input::placeholder,
 .campo textarea::placeholder {
-  color: #7d8a80;
+  color: var(--tinta-fraca);
 }
 
 .filtros {
@@ -754,7 +754,7 @@
 }
 
 .sheet::backdrop {
-  background: rgb(23 39 29 / 0.5);
+  background: var(--veu);
   animation: aparece 0.2s ease-out;
 }
 
@@ -1031,6 +1031,10 @@ fieldset.campo {
   background-repeat: no-repeat;
   background-position: right 10px center;
   background-size: 20px;
+}
+
+:root[data-theme='dark'] .campo select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23dfe9d5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
 }
 
 /* No Safari do iOS o campo de hora tem largura própria: ignora a da coluna, invade o campo
@@ -1606,4 +1610,83 @@ fieldset.campo {
   .bloco-mascote > p:first-of-type {
     padding-right: 76px;
   }
+}
+
+/* ── Ajustes deste aparelho: aparência e remédios avisados ─────────────── */
+
+.opcoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--e-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.opcao {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--e-4);
+  border: 1.5px solid var(--linha-forte);
+  border-radius: var(--capsula);
+  color: var(--boldo);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.opcao input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.opcao:has(input:checked) {
+  border-color: var(--boldo);
+  background: var(--boldo);
+  color: var(--creme);
+}
+
+.opcao:has(input:focus-visible) {
+  outline: 3px solid var(--folha);
+  outline-offset: 2px;
+}
+
+.avisados {
+  display: grid;
+  border-top: 1px solid var(--linha);
+}
+
+.avisado {
+  display: flex;
+  align-items: center;
+  gap: var(--e-3);
+  min-height: 52px;
+  padding: var(--e-2) 0;
+  border-bottom: 1px solid var(--linha);
+  cursor: pointer;
+}
+
+.avisado input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--folha);
+}
+
+.avisado-nome {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.avisado-nome span {
+  margin-left: var(--e-2);
+  color: var(--tinta-suave);
+  font-weight: 400;
 }

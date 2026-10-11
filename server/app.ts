@@ -288,6 +288,33 @@ export function createApp(options: AppOptions): Hono {
     return c.json({ devices: await store.countSubscriptions() });
   });
 
+  // O "aparelho" é a inscrição de push dele: o endereço (endpoint) é a identidade.
+  app.post('/api/push/device', async (c) => {
+    const body = (await readJson(c)) as { endpoint?: unknown } | null;
+    const muted =
+      typeof body?.endpoint === 'string' ? await store.getMutedMedicines(body.endpoint) : null;
+    if (!muted) return c.json({ error: 'Este aparelho não está recebendo lembretes.' }, 404);
+    return c.json({ mutedMedicines: muted });
+  });
+
+  app.put('/api/push/device', async (c) => {
+    const body = (await readJson(c)) as { endpoint?: unknown; mutedMedicines?: unknown } | null;
+    const ids = body?.mutedMedicines;
+    if (
+      typeof body?.endpoint !== 'string' ||
+      !Array.isArray(ids) ||
+      ids.length > 1000 ||
+      !ids.every((id) => Number.isInteger(id) && id > 0)
+    ) {
+      return c.json({ error: 'Lista de remédios inválida.' }, 400);
+    }
+    const mutedMedicines = [...new Set(ids as number[])].sort((x, y) => x - y);
+    if (!(await store.setMutedMedicines(body.endpoint, mutedMedicines))) {
+      return c.json({ error: 'Este aparelho não está recebendo lembretes.' }, 404);
+    }
+    return c.json({ mutedMedicines });
+  });
+
   app.post('/api/push/test', async (c) => {
     const delivered = await sender.send({
       title: 'Lembretes funcionando',

@@ -8,8 +8,11 @@ import type { Store } from './store';
  */
 
 export interface PushSender {
-  /** Envia para todos os aparelhos inscritos. Devolve quantos receberam. */
-  send(payload: PushPayload): Promise<number>;
+  /**
+   * Envia para os aparelhos inscritos e devolve quantos receberam. Com `medicineId`, ficam
+   * de fora os aparelhos que silenciaram esse remédio.
+   */
+  send(payload: PushPayload, medicineId?: number): Promise<number>;
 }
 
 export interface VapidKeys {
@@ -167,9 +170,11 @@ export function createWebPushSender(
   now: () => Date = () => new Date(),
 ): PushSender {
   return {
-    async send(payload) {
+    async send(payload, medicineId) {
       const message = text.encode(JSON.stringify(payload));
-      const subscriptions = await store.listSubscriptions();
+      const subscriptions = (await store.listSubscriptions()).filter(
+        (device) => medicineId === undefined || !device.mutedMedicines.includes(medicineId),
+      );
       const results = await Promise.all(
         subscriptions.map(async (subscription) => {
           try {

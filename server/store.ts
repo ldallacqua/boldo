@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS boldo.push_subscriptions (
   endpoint text PRIMARY KEY,
   p256dh text NOT NULL,
   auth text NOT NULL,
+  -- Remédios (ids) sobre os quais este aparelho não quer ser avisado.
+  muted_medicines jsonb NOT NULL DEFAULT '[]',
   created_at text NOT NULL
 );
 CREATE TABLE IF NOT EXISTS boldo.settings (
@@ -127,6 +129,14 @@ export interface PushSubscriptionRow {
   auth: string;
 }
 
+/** Um aparelho inscrito e os remédios que ele silenciou. */
+export interface PushDevice extends PushSubscriptionRow {
+  mutedMedicines: number[];
+}
+
+const toIds = (value: number[] | string): number[] =>
+  typeof value === 'string' ? (JSON.parse(value) as number[]) : value;
+
 export interface AlertStages {
   stockStage: number;
   expiryStage: number;
@@ -174,12 +184,22 @@ export class Store {
 
   /** Atualiza bancos criados por versões anteriores. Cada passo confere se ainda é preciso. */
   private async migrate(): Promise<void> {
-    const columns = await this.db.query<{ column_name: string }>(
-      `SELECT column_name FROM information_schema.columns
-        WHERE table_schema = 'boldo' AND table_name = 'medicines'`,
+    const columns = await this.db.query<{ table_name: string; column_name: string }>(
+      `SELECT table_name, column_name FROM information_schema.columns
+        WHERE table_schema = 'boldo' AND table_name IN ('medicines', 'push_subscriptions')`,
     );
+    const has = (table: string, column: string) =>
+      columns.some((c) => c.table_name === table && c.column_name === column);
+
+    // Cada aparelho passou a poder silenciar remédios.
+    if (!has('push_subscriptions', 'muted_medicines')) {
+      await this.db.exec(
+        `ALTER TABLE boldo.push_subscriptions
+           ADD COLUMN IF NOT EXISTS muted_medicines jsonb NOT NULL DEFAULT '[]'`,
+      );
+    }
     // "Pra que serve" era um texto livre (`purpose`) e virou tags.
-    if (columns.some((column) => column.column_name === 'purpose')) {
+    if (has('medicines', 'purpose')) {
       await this.db.transaction(async (tx) => {
         await tx.exec(
           "ALTER TABLE boldo.medicines ADD COLUMN IF NOT EXISTS tags jsonb NOT NULL DEFAULT '[]'",
@@ -459,10 +479,33 @@ export class Store {
 
   // ── Notificações ───────────────────────────────────────────────────────
 
-  listSubscriptions(): Promise<PushSubscriptionRow[]> {
-    return this.db.query<PushSubscriptionRow>(
-      'SELECT endpoint, p256dh, auth FROM boldo.push_subscriptions',
+  async listSubscriptions(): Promise<PushDevice[]> {
+    const rows = await this.db.query<PushSubscriptionRow & { muted_medicines: number[] | string }>(
+      'SELECT endpoint, p256dh, auth, muted_medicines FROM boldo.push_subscriptions',
     );
+    return rows.map(({ muted_medicines, ...row }) => ({
+      ...row,
+      mutedMedicines: toIds(muted_medicines),
+    }));
+  }
+
+  /** Os remédios silenciados em um aparelho, ou `null` se ele não está inscrito. */
+  async getMutedMedicines(endpoint: string): Promise<number[] | null> {
+    const [row] = await this.db.query<{ muted_medicines: number[] | string }>(
+      'SELECT muted_medicines FROM boldo.push_subscriptions WHERE endpoint = $1',
+      [endpoint],
+    );
+    return row ? toIds(row.muted_medicines) : null;
+  }
+
+  /** Devolve `false` se o aparelho não está inscrito. */
+  async setMutedMedicines(endpoint: string, medicineIds: number[]): Promise<boolean> {
+    const updated = await this.db.query(
+      `UPDATE boldo.push_subscriptions SET muted_medicines = $1::jsonb
+        WHERE endpoint = $2 RETURNING endpoint`,
+      [JSON.stringify(medicineIds), endpoint],
+    );
+    return updated.length > 0;
   }
 
   async countSubscriptions(): Promise<number> {

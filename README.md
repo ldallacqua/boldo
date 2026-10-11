@@ -33,6 +33,9 @@ Supabase; veja [docs/hospedagem.md](docs/hospedagem.md)).
     permite);
   - quando um remédio está acabando ou acabou;
   - quando a validade está chegando (30 dias antes, configurável) e quando vence.
+- **Cada aparelho escolhe seus avisos**: em Ajustes, desmarque os remédios de outra pessoa
+  da casa e aquele celular deixa de ser avisado sobre eles; os outros continuam recebendo.
+- **Tema claro ou escuro**, seguindo o aparelho ou escolhido em Ajustes.
 - **Tarja de estado**: a faixa colorida de cada remédio resume a situação. Verde está em
   ordem, mostarda pede atenção (acabando ou vencendo), vermelha é acabou ou venceu.
 - **Instalável** no celular, tablet e computador, e abre mesmo sem internet (os dados

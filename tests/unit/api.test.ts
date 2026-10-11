@@ -332,6 +332,34 @@ describe('ajustes e notificações', () => {
     expect(removed.body).toEqual({ devices: 0 });
   });
 
+  it('cada aparelho guarda os remédios que silenciou', async () => {
+    const endpoint = 'https://push.example/celular';
+    const device = (body: object = {}) => ({ endpoint, ...body });
+    expect((await t.call('POST', '/api/push/device', device())).status).toBe(404);
+    expect((await t.call('PUT', '/api/push/device', device({ mutedMedicines: [1] }))).status).toBe(
+      404,
+    );
+
+    await t.call('POST', '/api/push/subscribe', { endpoint, keys: { p256dh: 'a', auth: 'b' } });
+    expect((await t.call('POST', '/api/push/device', device())).body).toEqual({
+      mutedMedicines: [],
+    });
+
+    const saved = await t.call('PUT', '/api/push/device', device({ mutedMedicines: [5, 2, 5] }));
+    expect(saved.body).toEqual({ mutedMedicines: [2, 5] });
+    // Reinscrever o mesmo aparelho (chaves renovadas) não apaga a escolha.
+    await t.call('POST', '/api/push/subscribe', { endpoint, keys: { p256dh: 'c', auth: 'd' } });
+    expect((await t.call('POST', '/api/push/device', device())).body).toEqual({
+      mutedMedicines: [2, 5],
+    });
+
+    for (const mutedMedicines of ['2', [1.5], [-1], [null]]) {
+      expect((await t.call('PUT', '/api/push/device', device({ mutedMedicines }))).status).toBe(
+        400,
+      );
+    }
+  });
+
   it('recusa inscrição incompleta ou sem https', async () => {
     const bad = [
       {},
