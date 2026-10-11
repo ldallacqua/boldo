@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createMedicine, everyDay, login, unique } from './helpers';
+import { createMedicine, everyDay, login, stockOf, unique } from './helpers';
 
 test.beforeEach(async ({ page }) => {
   await login(page);
@@ -57,10 +57,7 @@ test('registra a dose, desconta do estoque e desfaz', async ({ page }, info) => 
     quantity: 10,
     schedules: [{ time: '00:01', days: everyDay, dose: 2 }],
   });
-  const stock = async () => {
-    const list = await (await page.request.get('/api/medicines')).json();
-    return list.find((m: { id: number }) => m.id === medicine.id).quantity;
-  };
+  const stock = () => stockOf(page, medicine.id);
 
   await page.goto('/');
   const doses = page.getByRole('region', { name: 'Doses de hoje' });

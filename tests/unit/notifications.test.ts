@@ -1,14 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { PushPayload } from '../../shared/types';
-import { handleNotificationClick, toNotification } from '../../src/lib/notifications';
+import { appUrl, handleNotificationClick, toNotification } from '../../src/lib/notifications';
 
 const dosePayload: PushPayload = {
   title: 'Hora de tomar Losartana',
   body: '1 comprimido (50 mg) às 08:00',
   tag: 'dose-7-2026-10-12',
   url: '/',
-  dose: { scheduleId: 7, date: '2026-10-12' },
+  dose: { scheduleId: 7, date: '2026-10-12', token: 'assinatura' },
 };
+
+/** O app publicado em uma subpasta, como no GitHub Pages. */
+const SCOPE = 'https://exemplo.github.io/boldo/';
 
 const stockPayload: PushPayload = {
   title: 'Dipirona está acabando',
@@ -25,13 +28,13 @@ const effects = (takeDose: () => Promise<boolean> = async () => true) => ({
 
 describe('toNotification', () => {
   it('lembrete de dose vem com o botão "Tomei"', () => {
-    expect(toNotification(dosePayload)).toEqual({
+    expect(toNotification(dosePayload, SCOPE)).toEqual({
       title: 'Hora de tomar Losartana',
       options: {
         body: '1 comprimido (50 mg) às 08:00',
         tag: 'dose-7-2026-10-12',
-        icon: '/icons/icon-192.png',
-        badge: '/icons/badge-96.png',
+        icon: 'https://exemplo.github.io/boldo/icons/icon-192.png',
+        badge: 'https://exemplo.github.io/boldo/icons/badge-96.png',
         lang: 'pt-BR',
         data: dosePayload,
         actions: [{ action: 'take', title: 'Tomei' }],
@@ -40,7 +43,15 @@ describe('toNotification', () => {
   });
 
   it('aviso de estoque não tem botão', () => {
-    expect(toNotification(stockPayload).options.actions).toEqual([]);
+    expect(toNotification(stockPayload, SCOPE).options.actions).toEqual([]);
+  });
+
+  it('resolve os endereços dos avisos dentro da pasta do app', () => {
+    expect(appUrl('/remedios/3', SCOPE)).toBe('https://exemplo.github.io/boldo/remedios/3');
+    expect(appUrl('/', SCOPE)).toBe(SCOPE);
+    expect(appUrl('/remedios/3', 'https://boldo.example/')).toBe(
+      'https://boldo.example/remedios/3',
+    );
   });
 });
 
@@ -48,7 +59,7 @@ describe('handleNotificationClick', () => {
   it('"Tomei" registra a dose e atualiza as telas abertas, sem abrir o app', async () => {
     const fx = effects();
     await handleNotificationClick('take', dosePayload, fx);
-    expect(fx.takeDose).toHaveBeenCalledWith(7, '2026-10-12');
+    expect(fx.takeDose).toHaveBeenCalledWith(dosePayload.dose);
     expect(fx.refresh).toHaveBeenCalledOnce();
     expect(fx.open).not.toHaveBeenCalled();
   });

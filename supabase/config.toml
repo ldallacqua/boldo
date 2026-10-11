@@ -1,0 +1,8 @@
+# Projeto Supabase usado na hospedagem gratuita (veja docs/hospedagem.md).
+project_id = "boldo"
+
+[functions.api]
+# A API tem a própria autenticação (senha única + token); o JWT do Supabase não é usado.
+verify_jwt = false
+# Gerado por `npm run build:edge` a partir de supabase/functions/api/main.ts.
+entrypoint = "./functions/api/index.js"

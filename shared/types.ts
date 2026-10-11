@@ -104,5 +104,10 @@ export interface PushPayload {
   tag: string;
   url: string;
   /** Presente nos lembretes de dose, para o botão "Tomei" da notificação. */
-  dose?: { scheduleId: number; date: string };
+  dose?: {
+    scheduleId: number;
+    date: string;
+    /** Autoriza registrar só esta dose, sem precisar da sessão. */
+    token: string;
+  };
 }

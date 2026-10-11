@@ -12,10 +12,10 @@ services:
     environment:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Defina ADMIN_PASSWORD no arquivo .env}
       TZ: ${TZ:-America/Sao_Paulo}
-      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:boldo@localhost.invalid}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-https://github.com/ldallacqua/boldo}
       TRUST_PROXY: ${TRUST_PROXY:-0}
     volumes:
-      # O banco (boldo.db) mora aqui. Não apague este volume: é a sua farmacinha.
+      # O banco mora aqui. Não apague este volume: é a sua farmacinha.
       - boldo-data:/data
 
 volumes:

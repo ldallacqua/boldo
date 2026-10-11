@@ -7,3 +7,7 @@ test-results
 package-lock.json
 public/icons
 .e2e-data
+dist-pages
+supabase/functions/api/index.js
+art
+public/mascote

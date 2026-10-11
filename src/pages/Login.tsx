@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { Mark } from '../components/Icon';
+import { Mascote } from '../components/Mascote';
 import { api } from '../lib/api';
 
 export function Login() {
@@ -19,10 +20,7 @@ export function Login() {
   return (
     <div className="entrada">
       <div className="entrada-capa" aria-hidden="true">
-        <svg className="entrada-folha" viewBox="0 0 400 400">
-          <path d="M40 360C40 170 170 40 360 40c0 190-130 320-320 320Z" />
-          <path d="M40 360 250 150M120 280V170M120 280h110M190 210v-75M190 210h75" />
-        </svg>
+        <Mascote pose="ola" size={420} />
       </div>
 
       <main className="entrada-form">

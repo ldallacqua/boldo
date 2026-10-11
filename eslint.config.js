@@ -9,6 +9,8 @@ export default tseslint.config(
       'dist',
       'dist-server',
       'dev-dist',
+      'dist-pages',
+      'supabase/functions/api/index.js',
       'playwright-report',
       'test-results',
       'data',

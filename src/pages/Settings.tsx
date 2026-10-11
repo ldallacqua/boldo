@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Icon } from '../components/Icon';
+import { Mascote } from '../components/Mascote';
 import { LoadError, Loading } from '../components/States';
 import { useToast } from '../components/Toast';
 import { api } from '../lib/api';
@@ -69,7 +70,8 @@ function Reminders({ vapidPublicKey, devices }: { vapidPublicKey: string; device
   };
 
   return (
-    <section className="bloco" aria-labelledby="lembretes-titulo">
+    <section className="bloco bloco-mascote" aria-labelledby="lembretes-titulo">
+      <Mascote pose="lembrete" size={104} />
       <h2 id="lembretes-titulo">Lembretes neste aparelho</h2>
       <p data-testid="push-estado">{state ? PUSH_TEXT[state] : 'Verificando…'}</p>
       <div className="acoes">
@@ -238,12 +240,26 @@ export function Settings() {
     return <LoadError message={settings.error.message} onRetry={() => settings.refetch()} />;
   }
 
-  const logout = async () => {
+  const logout = () => {
+    api.logout();
+    client.setQueryData(['session'], { authenticated: false });
+    // Não sobra dado de remédio na memória depois de sair.
+    client.removeQueries({ predicate: (query) => query.queryKey[0] !== 'session' });
+  };
+
+  // A API exige o token no cabeçalho, então um link comum não serve: baixa e salva pelo app.
+  const download = async () => {
     try {
-      await api.logout();
-      client.setQueryData(['session'], { authenticated: false });
-      // Não sobra dado de remédio na memória depois de sair.
-      client.removeQueries({ predicate: (query) => query.queryKey[0] !== 'session' });
+      const data = await api.exportData();
+      const url = URL.createObjectURL(
+        new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }),
+      );
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `boldo-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast('Cópia baixada');
     } catch (error) {
       toast((error as Error).message, 'error');
     }
@@ -270,10 +286,10 @@ export function Settings() {
             farmacinha. Baixe uma cópia quando quiser guardar um backup.
           </p>
           <div className="acoes">
-            <a className="botao" data-variant="secundario" href="/api/export" download>
+            <button type="button" className="botao" data-variant="secundario" onClick={download}>
               <Icon name="download" size={20} />
               Baixar cópia dos dados
-            </a>
+            </button>
             <button type="button" className="botao" data-variant="texto" onClick={logout}>
               <Icon name="logout" size={20} />
               Sair

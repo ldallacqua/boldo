@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { Route, Switch } from 'wouter';
+import { Link, Route, Switch } from 'wouter';
 import { Shell } from './components/Shell';
 import { Empty, LoadError, Loading } from './components/States';
 import { useSession } from './lib/queries';
@@ -36,11 +36,11 @@ export function App() {
         <Route path="/remedios/*?" component={Medicines} />
         <Route path="/ajustes" component={Settings} />
         <Route>
-          <Empty title="Página não encontrada">
+          <Empty title="Página não encontrada" pose="ops">
             <p>Esse endereço não existe no Boldo.</p>
-            <a className="botao" href="/">
+            <Link className="botao" href="/">
               Ir para Hoje
-            </a>
+            </Link>
           </Empty>
         </Route>
       </Switch>

@@ -1,41 +1,60 @@
-// Gera os ícones do PWA em public/icons a partir do desenho da folha de boldo.
-// Rode com `npm run icons` depois de mudar o logotipo.
+// Gera, a partir das artes do Boldinho em art/mascote/, os ícones do PWA (public/icons) e as
+// versões leves usadas nas telas (public/mascote). Rode com `npm run icons` ao trocar a arte.
 import { mkdir } from 'node:fs/promises';
 import sharp from 'sharp';
 
-const OUT = new URL('../public/icons/', import.meta.url);
+const ART = new URL('../art/mascote/', import.meta.url).pathname;
+const ICONS = new URL('../public/icons/', import.meta.url).pathname;
+const MASCOT = new URL('../public/mascote/', import.meta.url).pathname;
+const CREME = '#f3ecd9';
 
-const LEAF = `
-  <path d="M12 36c0-15 9-24 24-24 0 15-9 24-24 24Z" fill="#f3ecd9"/>
-  <path d="M12 36 27 21M19.5 28.5V21M19.5 28.5H27" fill="none" stroke="#2c6a45"
-        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+await mkdir(ICONS, { recursive: true });
+await mkdir(MASCOT, { recursive: true });
 
-/** Ícone comum: quadrado arredondado. */
-const rounded = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-  <rect width="48" height="48" rx="11" fill="#1c3829"/>${LEAF}</svg>`;
+/** O mascote sem as margens transparentes, pronto para ser reposicionado. */
+const trimmed = (pose) => sharp(`${ART}${pose}.png`).trim().toBuffer();
 
-/** Maskable/Apple: fundo até a borda e folha dentro da área segura (80% central). */
-const fullBleed = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-  <rect width="48" height="48" fill="#1c3829"/>
-  <g transform="translate(24 24) scale(0.74) translate(-24 -24)">${LEAF}</g></svg>`;
-
-/** Selo monocromático da barra de status do Android (só o canal alfa é usado). */
-const badge = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-  <path d="M6 42C6 19.5 19.5 6 42 6c0 22.5-13.5 36-36 36Z" fill="#fff"/></svg>`;
-
-const files = [
-  ['icon-192.png', rounded, 192],
-  ['icon-512.png', rounded, 512],
-  ['icon-maskable-512.png', fullBleed, 512],
-  ['apple-touch-icon.png', fullBleed, 180],
-  ['badge-96.png', badge, 96],
-];
-
-await mkdir(OUT, { recursive: true });
-for (const [name, svg, size] of files) {
-  await sharp(Buffer.from(svg), { density: 600 })
-    .resize(size, size)
+/** Mascote centralizado em um quadrado creme. `fill` é quanto do quadrado ele ocupa. */
+async function icon(name, size, fill, radius = 0) {
+  const inner = Math.round(size * fill);
+  const mascot = await sharp(await trimmed('ola'))
+    .resize(inner, inner, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .toBuffer();
+  const background = Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
+       <rect width="${size}" height="${size}" rx="${radius * size}" fill="${CREME}"/>
+     </svg>`,
+  );
+  await sharp(background)
+    .composite([{ input: mascot, gravity: 'centre' }])
     .png()
-    .toFile(new URL(name, OUT).pathname);
+    .toFile(`${ICONS}${name}`);
   console.log(`public/icons/${name}`);
+}
+
+// Ícone comum: cantos arredondados. Maskable/Apple: fundo até a borda, mascote na área segura.
+await icon('icon-192.png', 192, 0.84, 0.22);
+await icon('icon-512.png', 512, 0.84, 0.22);
+await icon('icon-maskable-512.png', 512, 0.62);
+await icon('apple-touch-icon.png', 180, 0.74);
+
+// Selo monocromático da barra de status do Android: só a silhueta (o canal alfa) é usada.
+const silhouette = await sharp(await trimmed('ola'))
+  .resize(88, 88, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+  .extend({ top: 4, bottom: 4, left: 4, right: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } })
+  .extractChannel('alpha')
+  .toBuffer();
+await sharp({ create: { width: 96, height: 96, channels: 3, background: '#ffffff' } })
+  .joinChannel(silhouette)
+  .png()
+  .toFile(`${ICONS}badge-96.png`);
+console.log('public/icons/badge-96.png');
+
+// Poses para as telas: WebP pequeno, com folga para telas de alta densidade.
+for (const pose of ['ola', 'vazio', 'tudo-certo', 'lembrete', 'ops']) {
+  await sharp(await trimmed(pose))
+    .resize(640, 640, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .webp({ quality: 88, alphaQuality: 90 })
+    .toFile(`${MASCOT}${pose}.webp`);
+  console.log(`public/mascote/${pose}.webp`);
 }

@@ -12,6 +12,7 @@ test('tem um manifesto instalável com ícones que existem', async ({ page, requ
     short_name: 'Boldo',
     display: 'standalone',
     start_url: '/',
+    scope: '/',
     lang: 'pt-BR',
   });
 

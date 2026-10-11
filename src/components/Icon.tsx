@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { asset } from '../lib/config';
 
 const PATHS = {
   leaf: (
@@ -79,20 +80,16 @@ export function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
   );
 }
 
-/** A folha de boldo do logotipo. */
+/** O ícone do app: o Boldinho em um quadrado creme. */
 export function Mark({ size = 36 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
-      <rect width="48" height="48" rx="13" fill="var(--boldo)" />
-      <path d="M12 36c0-15 9-24 24-24 0 15-9 24-24 24Z" fill="var(--creme)" />
-      <path
-        d="M12 36 27 21M19.5 28.5V21M19.5 28.5H27"
-        fill="none"
-        stroke="var(--folha)"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <img
+      className="marca"
+      src={asset('icons/icon-192.png')}
+      width={size}
+      height={size}
+      alt=""
+      decoding="async"
+    />
   );
 }

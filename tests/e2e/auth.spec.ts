@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { login, PASSWORD } from './helpers';
+import { createMedicine, login, PASSWORD } from './helpers';
 
 test('pede a senha e recusa a errada', async ({ page }) => {
   await page.goto('/');
@@ -39,7 +39,7 @@ test('sem senha, a API não entrega nada', async ({ request }) => {
 test('a mesma farmacinha aparece em outro navegador', async ({ page, browser }, testInfo) => {
   const name = `Compartilhado ${testInfo.project.name} ${Date.now()}`;
   await login(page);
-  await page.request.post('/api/medicines', { data: { name, quantity: 7 } });
+  await createMedicine(page, { name, quantity: 7 });
 
   // Um navegador novo, sem nada guardado: só a senha.
   const other = await browser.newContext();

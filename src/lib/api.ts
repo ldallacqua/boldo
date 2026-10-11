@@ -5,7 +5,9 @@ import type {
   SettingsResponse,
   TodayResponse,
 } from '../../shared/types';
+import { API_BASE } from './config';
 import { queryClient } from './queryClient';
+import { getToken, setToken } from './session';
 
 export class ApiError extends Error {
   constructor(
@@ -19,10 +21,13 @@ export class ApiError extends Error {
 async function request<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(path, {
+    const token = getToken();
+    response = await fetch(`${API_BASE}${path}`, {
       method,
-      credentials: 'same-origin',
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
@@ -33,6 +38,7 @@ async function request<T>(path: string, method = 'GET', body?: unknown): Promise
   if (!response.ok) {
     // A sessão caiu: volta para a tela de senha.
     if (response.status === 401 && path !== '/api/login') {
+      setToken(null);
       queryClient.setQueryData(['session'], { authenticated: false });
     }
     throw new ApiError(response.status, data?.error ?? 'Algo deu errado. Tente de novo.');
@@ -47,10 +53,20 @@ async function request<T>(path: string, method = 'GET', body?: unknown): Promise
 export type DoseAction = 'take' | 'skip' | 'undo';
 
 export const api = {
-  session: () => request<{ authenticated: boolean }>('/api/session'),
-  login: (password: string) =>
-    request<{ authenticated: boolean }>('/api/login', 'POST', { password }),
-  logout: () => request<{ authenticated: boolean }>('/api/logout', 'POST'),
+  /** Sem token guardado, nem pergunta ao servidor. */
+  session: async () =>
+    getToken() ? request<{ authenticated: boolean }>('/api/session') : { authenticated: false },
+  login: async (password: string) => {
+    const result = await request<{ authenticated: boolean; token: string }>('/api/login', 'POST', {
+      password,
+    });
+    setToken(result.token);
+    return { authenticated: result.authenticated };
+  },
+  /** Sair é esquecer o token neste aparelho. */
+  logout: () => setToken(null),
+  /** Tudo o que está guardado, para backup. */
+  exportData: () => request<Record<string, unknown>>('/api/export'),
 
   medicines: () => request<Medicine[]>('/api/medicines'),
   createMedicine: (input: MedicineInput) => request<Medicine>('/api/medicines', 'POST', input),

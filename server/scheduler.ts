@@ -5,13 +5,26 @@ import { localNow } from '../shared/time';
 import type { Medicine, PushPayload } from '../shared/types';
 import type { PushSender } from './push';
 import type { Store } from './store';
+import type { Tokens } from './tokens';
+
+export interface TickContext {
+  store: Store;
+  sender: PushSender;
+  timezone: string;
+  tokens: Tokens;
+}
 
 /** Avisos de estoque e validade não saem depois deste horário, para não acordar ninguém. */
 const ALERTS_END = '21:00';
 
 const LOG_RETENTION_MS = 7 * 86_400_000;
 
-function doseReminder(medicine: Medicine, scheduleId: number, date: string): PushPayload {
+function doseReminder(
+  medicine: Medicine,
+  scheduleId: number,
+  date: string,
+  token: string,
+): PushPayload {
   const schedule = medicine.schedules.find((s) => s.id === scheduleId)!;
   const detail = medicine.dosage ? ` (${medicine.dosage})` : '';
   return {
@@ -19,7 +32,7 @@ function doseReminder(medicine: Medicine, scheduleId: number, date: string): Pus
     body: `${formatQuantity(schedule.dose, medicine.unit)}${detail} às ${schedule.time}`,
     tag: `dose-${scheduleId}-${date}`,
     url: '/',
-    dose: { scheduleId, date },
+    dose: { scheduleId, date, token },
   };
 }
 
@@ -69,26 +82,27 @@ const EXPIRY_STAGE = { none: 0, ok: 0, expiring: 1, expired: 2 } as const;
 
 /**
  * Uma passada do agendador: envia os lembretes de dose que venceram e os avisos de
- * estoque/validade que ainda não foram dados. Pode rodar quantas vezes for; nada sai repetido.
+ * estoque/validade que ainda não foram dados. Pode rodar quantas vezes for, até em paralelo;
+ * nada sai repetido.
  */
 export async function runTick(
-  store: Store,
-  sender: PushSender,
-  timezone: string,
+  { store, sender, timezone, tokens }: TickContext,
   instant: Date = new Date(),
 ): Promise<PushPayload[]> {
   const now = localNow(timezone, instant);
   const nowIso = instant.toISOString();
-  const settings = store.getSettings();
-  const medicines = store.listMedicines();
+  const settings = await store.getSettings();
+  const medicines = await store.listMedicines();
   const outbox: PushPayload[] = [];
 
-  const recorded = new Set(store.listIntakes(now.date).map((intake) => intake.schedule_id));
+  const intakes = await store.listIntakes(now.date);
+  const recorded = new Set(intakes.map((intake) => intake.schedule_id));
   for (const medicine of medicines) {
     for (const schedule of medicine.schedules) {
       if (!isReminderDue(schedule, now) || recorded.has(schedule.id)) continue;
-      if (store.claimNotification(`dose:${schedule.id}:${now.date}`, nowIso)) {
-        outbox.push(doseReminder(medicine, schedule.id, now.date));
+      if (await store.claimNotification(`dose:${schedule.id}:${now.date}`, nowIso)) {
+        const token = tokens.dose(schedule.id, now.date);
+        outbox.push(doseReminder(medicine, schedule.id, now.date, token));
       }
     }
   }
@@ -96,12 +110,13 @@ export async function runTick(
   const alertsOpen = now.time >= settings.alertTime && now.time < ALERTS_END;
   for (const medicine of medicines) {
     const health = healthOf(medicine, now.date, settings.expiryWarnDays);
-    const sent = store.getAlertStages(medicine.id);
+    const sent = await store.getAlertStages(medicine.id);
     const target = {
       stockStage: STOCK_STAGE[health.stock],
       expiryStage: EXPIRY_STAGE[health.expiry],
     };
     const next = { ...sent };
+    const alerts: PushPayload[] = [];
 
     // Melhorou (repôs o estoque, corrigiu a validade): rearma o aviso na hora.
     if (target.stockStage < sent.stockStage) next.stockStage = target.stockStage;
@@ -109,34 +124,30 @@ export async function runTick(
 
     if (alertsOpen) {
       if (target.stockStage > sent.stockStage) {
-        outbox.push(stockAlert(medicine, target.stockStage));
+        alerts.push(stockAlert(medicine, target.stockStage));
         next.stockStage = target.stockStage;
       }
       if (target.expiryStage > sent.expiryStage) {
-        outbox.push(expiryAlert(medicine, target.expiryStage, health.daysUntilExpiry ?? 0));
+        alerts.push(expiryAlert(medicine, target.expiryStage, health.daysUntilExpiry ?? 0));
         next.expiryStage = target.expiryStage;
       }
     }
 
-    if (next.stockStage !== sent.stockStage || next.expiryStage !== sent.expiryStage) {
-      store.setAlertStages(medicine.id, next);
-    }
+    if (next.stockStage === sent.stockStage && next.expiryStage === sent.expiryStage) continue;
+    // Só envia quem conseguiu gravar o novo estágio; outra passada simultânea fica de fora.
+    if (await store.advanceAlertStages(medicine.id, sent, next)) outbox.push(...alerts);
   }
 
-  store.pruneNotificationLog(new Date(instant.getTime() - LOG_RETENTION_MS).toISOString());
+  await store.pruneNotificationLog(new Date(instant.getTime() - LOG_RETENTION_MS).toISOString());
 
   for (const payload of outbox) await sender.send(payload);
   return outbox;
 }
 
-export function startScheduler(
-  store: Store,
-  sender: PushSender,
-  timezone: string,
-  intervalMs = 30_000,
-): () => void {
+/** No servidor Node, o próprio processo marca o tempo. Na hospedagem, é o cron do banco. */
+export function startScheduler(context: TickContext, intervalMs = 30_000): () => void {
   const tick = () => {
-    runTick(store, sender, timezone).catch((error) => console.error('[agendador]', error));
+    runTick(context).catch((error) => console.error('[agendador]', error));
   };
   tick();
   const timer = setInterval(tick, intervalMs);

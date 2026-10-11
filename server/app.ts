@@ -1,18 +1,14 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { getConnInfo } from '@hono/node-server/conninfo';
-import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono, type Context } from 'hono';
-import { deleteCookie, getSignedCookie, setSignedCookie } from 'hono/cookie';
+import { cors } from 'hono/cors';
 import { doseStatus, isScheduledOn } from '../shared/schedule';
 import { daysBetween, localNow } from '../shared/time';
 import type { DoseToday, SettingsResponse, TodayResponse } from '../shared/types';
 import { parseMedicineInput, parseSettings } from '../shared/validate';
 import type { PushSender } from './push';
+import { runTick } from './scheduler';
 import type { Store } from './store';
+import { sameText, type Tokens } from './tokens';
 
-const SESSION_COOKIE = 'boldo_session';
 const SESSION_DAYS = 180;
 const LOGIN_MAX_FAILURES = 8;
 const LOGIN_WINDOW_MS = 15 * 60_000;
@@ -21,45 +17,39 @@ export interface AppOptions {
   store: Store;
   sender: PushSender;
   password: string;
-  /** Segredo aleatório guardado no banco; junto com a senha, assina o cookie de sessão. */
-  sessionSecret: string;
+  /** Assina sessões e ações de notificação. Derive de um segredo do banco + a senha. */
+  tokens: Tokens;
   timezone: string;
   vapidPublicKey: string;
-  /** Pasta com o front-end já compilado. Sem ela, só a API é servida. */
-  staticDir?: string;
+  /** Origens de onde o app pode chamar a API quando é servido de outro endereço (CORS). */
+  allowedOrigins?: string[];
+  /** Com ele, `POST /api/tick` roda o agendador (para um cron externo chamar). */
+  cronSecret?: string;
   /** Confiar no X-Forwarded-For para o limite de tentativas de login. */
   trustProxy?: boolean;
+  /** Endereço de quem chamou, quando o ambiente sabe dizer (o servidor Node sabe). */
+  clientAddress?: (c: Context) => string | undefined;
   now?: () => Date;
 }
 
-function sameText(a: string, b: string): boolean {
-  const digest = (value: string) => createHash('sha256').update(value).digest();
-  return timingSafeEqual(digest(a), digest(b));
+function bearer(c: Context): string | undefined {
+  return c.req.header('authorization')?.match(/^Bearer (.+)$/)?.[1];
 }
 
 export function createApp(options: AppOptions): Hono {
-  const { store, sender, timezone } = options;
+  const { store, sender, timezone, tokens } = options;
   const now = options.now ?? (() => new Date());
-  // Trocar a senha muda a assinatura e derruba todas as sessões abertas.
-  const cookieSecret = `${options.sessionSecret}:${options.password}`;
-  const failures = new Map<string, { count: number; resetAt: number }>();
 
   const clientKey = (c: Context): string => {
     if (options.trustProxy) {
       const forwarded = c.req.header('x-forwarded-for')?.split(',')[0]?.trim();
       if (forwarded) return forwarded;
     }
-    try {
-      return getConnInfo(c).remote.address ?? 'local';
-    } catch {
-      return 'local';
-    }
+    return options.clientAddress?.(c) ?? 'local';
   };
 
-  const isAuthenticated = async (c: Context): Promise<boolean> => {
-    const value = await getSignedCookie(c, cookieSecret, SESSION_COOKIE);
-    return typeof value === 'string' && Number(value) > now().getTime();
-  };
+  const isAuthenticated = (c: Context): boolean =>
+    tokens.isValidSession(bearer(c), now().getTime());
 
   const idParam = (c: Context, name = 'id'): number | null => {
     const id = Number(c.req.param(name));
@@ -74,6 +64,15 @@ export function createApp(options: AppOptions): Hono {
     }
   };
 
+  /** A notificação pode ser respondida depois da meia-noite; aceita hoje ou ontem. */
+  const doseDate = (requested: unknown): string | null => {
+    const today = localNow(timezone, now()).date;
+    if (requested === undefined || requested === null) return today;
+    if (typeof requested !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(requested)) return null;
+    const age = daysBetween(requested, today);
+    return age === 0 || age === 1 ? requested : null;
+  };
+
   const app = new Hono();
 
   app.onError((error, c) => {
@@ -81,75 +80,102 @@ export function createApp(options: AppOptions): Hono {
     return c.json({ error: 'Algo deu errado no servidor. Tente de novo.' }, 500);
   });
 
+  if (options.allowedOrigins?.length) {
+    app.use(
+      '/api/*',
+      cors({
+        origin: options.allowedOrigins,
+        allowHeaders: ['Authorization', 'Content-Type'],
+        allowMethods: ['GET', 'POST', 'PUT', 'DELETE'],
+        maxAge: 86_400,
+      }),
+    );
+  }
+
+  // ── Sem sessão ─────────────────────────────────────────────────────────
+
   app.get('/api/health', (c) => c.json({ ok: true }));
 
-  app.get('/api/session', async (c) => c.json({ authenticated: await isAuthenticated(c) }));
+  app.get('/api/session', (c) => c.json({ authenticated: isAuthenticated(c) }));
 
   app.post('/api/login', async (c) => {
     const key = clientKey(c);
     const current = now().getTime();
-    const entry = failures.get(key);
-    if (entry && entry.resetAt <= current) failures.delete(key);
-    if ((failures.get(key)?.count ?? 0) >= LOGIN_MAX_FAILURES) {
+    if ((await store.loginFailures(key, current)) >= LOGIN_MAX_FAILURES) {
       return c.json({ error: 'Muitas tentativas. Espere 15 minutos e tente de novo.' }, 429);
     }
 
     const body = (await readJson(c)) as { password?: unknown } | null;
     const password = typeof body?.password === 'string' ? body.password : '';
     if (!sameText(password, options.password)) {
-      const failed = failures.get(key) ?? { count: 0, resetAt: current + LOGIN_WINDOW_MS };
-      failed.count += 1;
-      failures.set(key, failed);
+      await store.recordLoginFailure(key, current, LOGIN_WINDOW_MS);
       return c.json({ error: 'Senha incorreta.' }, 401);
     }
 
-    failures.delete(key);
-    const maxAge = SESSION_DAYS * 86_400;
-    const https =
-      c.req.header('x-forwarded-proto') === 'https' || new URL(c.req.url).protocol === 'https:';
-    await setSignedCookie(c, SESSION_COOKIE, String(current + maxAge * 1000), cookieSecret, {
-      httpOnly: true,
-      sameSite: 'Strict',
-      secure: https,
-      path: '/',
-      maxAge,
-    });
-    return c.json({ authenticated: true });
+    await store.clearLoginFailures(key);
+    const token = tokens.session(current + SESSION_DAYS * 86_400_000);
+    return c.json({ authenticated: true, token });
   });
 
-  app.post('/api/logout', (c) => {
-    deleteCookie(c, SESSION_COOKIE, { path: '/' });
-    return c.json({ authenticated: false });
+  // Botão "Tomei" da notificação: quem autoriza é o token que foi dentro do lembrete.
+  app.post('/api/push-action/take', async (c) => {
+    const body = (await readJson(c)) as {
+      scheduleId?: unknown;
+      date?: unknown;
+      token?: unknown;
+    } | null;
+    const scheduleId = Number(body?.scheduleId);
+    const date = doseDate(body?.date);
+    if (!Number.isInteger(scheduleId) || !date || typeof body?.date !== 'string') {
+      return c.json({ error: 'Dose inválida.' }, 400);
+    }
+    if (!tokens.isValidDose(scheduleId, date, body?.token)) {
+      return c.json({ error: 'Este lembrete não vale mais. Abra o app para registrar.' }, 401);
+    }
+    if (!(await store.recordIntake(scheduleId, date, 'taken', now().toISOString()))) {
+      return c.json({ error: 'Esse horário não existe mais.' }, 404);
+    }
+    return c.json({ ok: true });
+  });
+
+  // Chamado a cada minuto pelo cron do banco quando não há um processo sempre ligado.
+  app.post('/api/tick', async (c) => {
+    const secret = options.cronSecret;
+    if (!secret || !sameText(bearer(c) ?? '', secret)) {
+      return c.json({ error: 'Não autorizado.' }, 401);
+    }
+    const sent = await runTick({ store, sender, timezone, tokens }, now());
+    return c.json({ sent: sent.length });
   });
 
   // Daqui para baixo, tudo em /api exige sessão.
   app.use('/api/*', async (c, next) => {
-    if (!(await isAuthenticated(c))) return c.json({ error: 'Entre com a senha.' }, 401);
+    if (!isAuthenticated(c)) return c.json({ error: 'Entre com a senha.' }, 401);
     await next();
   });
 
   // ── Remédios ───────────────────────────────────────────────────────────
 
-  app.get('/api/medicines', (c) => c.json(store.listMedicines()));
+  app.get('/api/medicines', async (c) => c.json(await store.listMedicines()));
 
   app.post('/api/medicines', async (c) => {
     const parsed = parseMedicineInput(await readJson(c));
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    return c.json(store.createMedicine(parsed.value, now().toISOString()), 201);
+    return c.json(await store.createMedicine(parsed.value, now().toISOString()), 201);
   });
 
   app.put('/api/medicines/:id', async (c) => {
     const id = idParam(c);
     const parsed = parseMedicineInput(await readJson(c));
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    const medicine = id && store.updateMedicine(id, parsed.value, now().toISOString());
+    const medicine = id && (await store.updateMedicine(id, parsed.value, now().toISOString()));
     if (!medicine) return c.json({ error: 'Remédio não encontrado.' }, 404);
     return c.json(medicine);
   });
 
-  app.delete('/api/medicines/:id', (c) => {
+  app.delete('/api/medicines/:id', async (c) => {
     const id = idParam(c);
-    if (!id || !store.deleteMedicine(id)) {
+    if (!id || !(await store.deleteMedicine(id))) {
       return c.json({ error: 'Remédio não encontrado.' }, 404);
     }
     return c.json({ ok: true });
@@ -162,18 +188,19 @@ export function createApp(options: AppOptions): Hono {
     if (typeof delta !== 'number' || !Number.isFinite(delta) || Math.abs(delta) > 100_000) {
       return c.json({ error: 'Ajuste inválido.' }, 400);
     }
-    const medicine = id && store.adjustQuantity(id, delta, now().toISOString());
+    const medicine = id && (await store.adjustQuantity(id, delta, now().toISOString()));
     if (!medicine) return c.json({ error: 'Remédio não encontrado.' }, 404);
     return c.json(medicine);
   });
 
   // ── Doses do dia ───────────────────────────────────────────────────────
 
-  app.get('/api/today', (c) => {
+  app.get('/api/today', async (c) => {
     const local = localNow(timezone, now());
-    const intakes = new Map(store.listIntakes(local.date).map((i) => [i.schedule_id, i]));
+    const recorded = await store.listIntakes(local.date);
+    const intakes = new Map(recorded.map((i) => [i.schedule_id, i]));
     const doses: DoseToday[] = [];
-    for (const medicine of store.listMedicines()) {
+    for (const medicine of await store.listMedicines()) {
       for (const schedule of medicine.schedules) {
         if (!isScheduledOn(schedule, local.weekday)) continue;
         const intake = intakes.get(schedule.id);
@@ -196,15 +223,6 @@ export function createApp(options: AppOptions): Hono {
     return c.json({ date: local.date, time: local.time, doses } satisfies TodayResponse);
   });
 
-  /** A notificação pode ser respondida depois da meia-noite; aceita hoje ou ontem. */
-  const doseDate = (requested: unknown): string | null => {
-    const today = localNow(timezone, now()).date;
-    if (requested === undefined || requested === null) return today;
-    if (typeof requested !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(requested)) return null;
-    const age = daysBetween(requested, today);
-    return age === 0 || age === 1 ? requested : null;
-  };
-
   app.post('/api/doses/:scheduleId/:action{take|skip|undo}', async (c) => {
     const scheduleId = idParam(c, 'scheduleId');
     const body = (await readJson(c)) as { date?: unknown } | null;
@@ -213,11 +231,11 @@ export function createApp(options: AppOptions): Hono {
 
     const action = c.req.param('action');
     if (action === 'undo') {
-      store.undoIntake(scheduleId, date);
+      await store.undoIntake(scheduleId, date);
       return c.json({ ok: true });
     }
     const status = action === 'take' ? 'taken' : 'skipped';
-    if (!store.recordIntake(scheduleId, date, status, now().toISOString())) {
+    if (!(await store.recordIntake(scheduleId, date, status, now().toISOString()))) {
       return c.json({ error: 'Esse horário não existe mais.' }, 404);
     }
     return c.json({ ok: true });
@@ -225,20 +243,20 @@ export function createApp(options: AppOptions): Hono {
 
   // ── Ajustes e notificações ─────────────────────────────────────────────
 
-  const settingsResponse = (): SettingsResponse => ({
-    ...store.getSettings(),
+  const settingsResponse = async (): Promise<SettingsResponse> => ({
+    ...(await store.getSettings()),
     timezone,
     vapidPublicKey: options.vapidPublicKey,
-    devices: store.countSubscriptions(),
+    devices: await store.countSubscriptions(),
   });
 
-  app.get('/api/settings', (c) => c.json(settingsResponse()));
+  app.get('/api/settings', async (c) => c.json(await settingsResponse()));
 
   app.put('/api/settings', async (c) => {
     const parsed = parseSettings(await readJson(c));
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-    store.saveSettings(parsed.value);
-    return c.json(settingsResponse());
+    await store.saveSettings(parsed.value);
+    return c.json(await settingsResponse());
   });
 
   app.post('/api/push/subscribe', async (c) => {
@@ -257,14 +275,14 @@ export function createApp(options: AppOptions): Hono {
     ) {
       return c.json({ error: 'Inscrição inválida.' }, 400);
     }
-    store.saveSubscription({ endpoint, p256dh, auth }, now().toISOString());
-    return c.json({ devices: store.countSubscriptions() }, 201);
+    await store.saveSubscription({ endpoint, p256dh, auth }, now().toISOString());
+    return c.json({ devices: await store.countSubscriptions() }, 201);
   });
 
   app.post('/api/push/unsubscribe', async (c) => {
     const body = (await readJson(c)) as { endpoint?: unknown } | null;
-    if (typeof body?.endpoint === 'string') store.deleteSubscription(body.endpoint);
-    return c.json({ devices: store.countSubscriptions() });
+    if (typeof body?.endpoint === 'string') await store.deleteSubscription(body.endpoint);
+    return c.json({ devices: await store.countSubscriptions() });
   });
 
   app.post('/api/push/test', async (c) => {
@@ -277,39 +295,18 @@ export function createApp(options: AppOptions): Hono {
     return c.json({ delivered });
   });
 
-  app.get('/api/export', (c) => {
+  app.get('/api/export', async (c) => {
     const local = localNow(timezone, now());
     c.header('Content-Disposition', `attachment; filename="boldo-${local.date}.json"`);
     return c.json({
       exportedAt: now().toISOString(),
-      settings: store.getSettings(),
-      medicines: store.listMedicines(),
-      intakes: store.listAllIntakes(),
+      settings: await store.getSettings(),
+      medicines: await store.listMedicines(),
+      intakes: await store.listAllIntakes(),
     });
   });
 
   app.all('/api/*', (c) => c.json({ error: 'Rota não encontrada.' }, 404));
-
-  // ── Front-end ──────────────────────────────────────────────────────────
-
-  const staticDir = options.staticDir;
-  if (staticDir) {
-    app.use(
-      '/*',
-      serveStatic({
-        root: staticDir,
-        onFound: (path, c) => {
-          const immutable = path.includes('/assets/');
-          c.header('Cache-Control', immutable ? 'public, max-age=31536000, immutable' : 'no-cache');
-        },
-      }),
-    );
-    // Qualquer outra rota é do app (SPA): devolve o index.html.
-    app.get('/*', async (c) => {
-      c.header('Cache-Control', 'no-cache');
-      return c.html(await readFile(join(staticDir, 'index.html'), 'utf8'));
-    });
-  }
 
   return app;
 }

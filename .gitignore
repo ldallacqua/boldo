@@ -10,3 +10,10 @@ test-results
 .DS_Store
 *.log
 .e2e-data
+
+.env.*
+!.env.example
+supabase/functions/api/index.js
+supabase/.temp
+supabase/.branches
+dist-pages

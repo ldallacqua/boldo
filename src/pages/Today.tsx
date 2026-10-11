@@ -2,6 +2,7 @@ import { Link } from 'wouter';
 import { attentionReasons, formatQuantity } from '../../shared/format';
 import type { DoseToday } from '../../shared/types';
 import { Icon } from '../components/Icon';
+import { Mascote } from '../components/Mascote';
 import { Empty, LoadError, Loading } from '../components/States';
 import { useToast } from '../components/Toast';
 import { formatClock, formatLongDate } from '../lib/dates';
@@ -177,7 +178,10 @@ export function Today() {
             Precisa de atenção
           </h2>
           {attention.length === 0 ? (
-            <p className="secao-vazia">Nada acabando nem vencendo.</p>
+            <p className="secao-vazia secao-vazia-mascote">
+              <Mascote pose="tudo-certo" size={72} />
+              Nada acabando nem vencendo.
+            </p>
           ) : (
             <ul className="lista">
               {attention.map(({ medicine, health }) => (

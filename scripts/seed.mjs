@@ -10,7 +10,7 @@ const login = await fetch(`${base}/api/login`, {
   body: JSON.stringify({ password }),
 });
 if (!login.ok) throw new Error(`Login falhou: ${login.status}`);
-const cookie = login.headers.get('set-cookie').split(';')[0];
+const { token } = await login.json();
 
 const month = (offset) => {
   const date = new Date();
@@ -117,7 +117,7 @@ const medicines = [
 for (const medicine of medicines) {
   const response = await fetch(`${base}/api/medicines`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(medicine),
   });
   if (!response.ok) throw new Error(`${medicine.name}: ${await response.text()}`);

@@ -1,4 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { APP_BASE } from '../lib/config';
+import { Mascote } from './Mascote';
 
 /** Última linha de defesa: um erro de tela vira uma mensagem com saída, não uma página em branco. */
 export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
@@ -17,9 +19,14 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
     return (
       <div className="conteudo">
         <div className="vazio" role="alert">
+          <Mascote pose="ops" size={140} />
           <h2>O Boldo tropeçou</h2>
           <p>Algo inesperado aconteceu nesta tela. Seus dados estão guardados no servidor.</p>
-          <button type="button" className="botao" onClick={() => window.location.assign('/')}>
+          <button
+            type="button"
+            className="botao"
+            onClick={() => window.location.assign(`${APP_BASE}/`)}
+          >
             Recarregar o app
           </button>
         </div>

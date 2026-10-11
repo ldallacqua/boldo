@@ -7,7 +7,8 @@ import {
 } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
 import type { PushPayload } from '../shared/types';
-import { handleNotificationClick, toNotification } from './lib/notifications';
+import { API_BASE } from './lib/config';
+import { appUrl, handleNotificationClick, toNotification } from './lib/notifications';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -18,12 +19,13 @@ precacheAndRoute(self.__WB_MANIFEST);
 
 // O app é uma SPA: toda navegação recebe o index.html do cache. A API nunca é cacheada.
 registerRoute(
-  new NavigationRoute(createHandlerBoundToURL('/index.html'), { denylist: [/^\/api\//] }),
+  new NavigationRoute(createHandlerBoundToURL('index.html'), { denylist: [/\/api\//] }),
 );
 
 self.addEventListener('push', (event) => {
   if (!event.data) return;
-  const { title, options } = toNotification(event.data.json() as PushPayload);
+  const payload = event.data.json() as PushPayload;
+  const { title, options } = toNotification(payload, self.registration.scope);
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
@@ -31,12 +33,11 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil(
     handleNotificationClick(event.action, event.notification.data as PushPayload, {
-      async takeDose(scheduleId, date) {
-        const response = await fetch(`/api/doses/${scheduleId}/take`, {
+      async takeDose(dose) {
+        const response = await fetch(`${API_BASE}/api/push-action/take`, {
           method: 'POST',
-          credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date }),
+          body: JSON.stringify(dose),
         });
         return response.ok;
       },
@@ -44,7 +45,8 @@ self.addEventListener('notificationclick', (event) => {
         const clients = await self.clients.matchAll({ type: 'window' });
         for (const client of clients) client.postMessage({ type: 'refresh' });
       },
-      async open(url) {
+      async open(path) {
+        const url = appUrl(path, self.registration.scope);
         const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
         const existing = clients[0];
         if (existing) {

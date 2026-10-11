@@ -6,10 +6,10 @@ import { expect, test } from '@playwright/test';
  * por um espião. O envio servidor → serviço de push do navegador não é coberto aqui: depende
  * da internet e de um aparelho real (use "Enviar um teste" em Ajustes).
  */
-test('o service worker transforma o push em notificação', async ({ browser }) => {
+test('o service worker transforma o push em notificação', async ({ browser, baseURL }) => {
   const context = await browser.newContext({ serviceWorkers: 'allow' });
   const page = await context.newPage();
-  await page.goto('/');
+  await page.goto('./');
   await page.evaluate(() => navigator.serviceWorker.ready);
   const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
 
@@ -18,7 +18,7 @@ test('o service worker transforma o push em notificação', async ({ browser }) 
     body: '1 comprimido (50 mg) às 08:00',
     tag: 'dose-7-2026-10-12',
     url: '/',
-    dose: { scheduleId: 7, date: '2026-10-12' },
+    dose: { scheduleId: 7, date: '2026-10-12', token: 'assinatura' },
   };
 
   const shown = await worker.evaluate(async (data) => {
@@ -38,8 +38,8 @@ test('o service worker transforma o push em notificação', async ({ browser }) 
       {
         body: payload.body,
         tag: payload.tag,
-        icon: '/icons/icon-192.png',
-        badge: '/icons/badge-96.png',
+        icon: new URL('icons/icon-192.png', baseURL).href,
+        badge: new URL('icons/badge-96.png', baseURL).href,
         lang: 'pt-BR',
         data: payload,
         actions: [{ action: 'take', title: 'Tomei' }],

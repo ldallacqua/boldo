@@ -1257,29 +1257,16 @@ fieldset.campo {
 }
 
 .entrada-capa {
-  position: relative;
+  display: grid;
+  place-items: end center;
   overflow: hidden;
-  background: var(--boldo);
+  background: var(--salvia);
 }
 
-.entrada-folha {
-  position: absolute;
-  right: -12%;
-  bottom: -55%;
-  width: min(125%, 640px);
-  rotate: -8deg;
-}
-
-.entrada-folha path:first-child {
-  fill: var(--folha);
-}
-
-.entrada-folha path:last-child {
-  fill: none;
-  stroke: var(--boldo);
-  stroke-width: 7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.entrada-capa .mascote {
+  width: auto;
+  height: min(25dvh, 230px);
+  margin-bottom: var(--e-2);
 }
 
 .entrada-form {
@@ -1293,11 +1280,8 @@ fieldset.campo {
   padding: var(--e-6) var(--e-5) var(--e-7);
 }
 
-.entrada-form > svg {
-  margin-top: calc(-28px - var(--e-6));
-  border-radius: 16px;
-  box-shadow: 0 0 0 5px var(--creme);
-  position: relative;
+.entrada-form > .marca {
+  display: none;
 }
 
 .entrada-form h1 {
@@ -1329,11 +1313,14 @@ fieldset.campo {
     grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
   }
 
-  .entrada-folha {
-    right: -6%;
-    bottom: -8%;
-    width: 96%;
-    max-width: 820px;
+  .entrada-capa {
+    place-items: center;
+  }
+
+  .entrada-capa .mascote {
+    width: min(62%, 460px);
+    height: auto;
+    margin-bottom: 0;
   }
 
   .entrada-form {
@@ -1341,12 +1328,57 @@ fieldset.campo {
     padding: var(--e-8) var(--e-7);
   }
 
-  .entrada-form > svg {
-    margin-top: 0;
-    box-shadow: none;
-  }
-
   .entrada-form h1 {
     font-size: 5.5rem;
+  }
+}
+
+/* ── Boldinho ──────────────────────────────────────────────────────────── */
+
+.mascote,
+.marca {
+  display: block;
+  flex: none;
+  object-fit: contain;
+}
+
+.marca {
+  border-radius: 22%;
+}
+
+.vazio .mascote {
+  margin-bottom: var(--e-1);
+}
+
+.secao-vazia-mascote {
+  display: flex;
+  align-items: center;
+  gap: var(--e-3);
+}
+
+.bloco-mascote {
+  position: relative;
+}
+
+.bloco-mascote > .mascote {
+  position: absolute;
+  top: var(--e-3);
+  right: var(--e-3);
+}
+
+.bloco-mascote > h2,
+.bloco-mascote > p:first-of-type {
+  padding-right: 104px;
+}
+
+@media (max-width: 520px) {
+  .bloco-mascote > .mascote {
+    width: 76px;
+    height: 76px;
+  }
+
+  .bloco-mascote > h2,
+  .bloco-mascote > p:first-of-type {
+    padding-right: 76px;
   }
 }

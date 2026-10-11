@@ -1,11 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createApp } from '../../server/app';
-import { everyDay, input, PASSWORD, testApp } from './helpers';
+import { CRON_SECRET, everyDay, input, testApp, testTokens } from './helpers';
 
-let t: ReturnType<typeof testApp>;
-beforeEach(() => {
+let t: Awaited<ReturnType<typeof testApp>>;
+beforeEach(async () => {
   // 12/10/2026 (segunda) às 08:00 em São Paulo.
-  t = testApp('2026-10-12T11:00:00Z');
+  t = await testApp('2026-10-12T11:00:00Z');
 });
 
 describe('sessão', () => {
@@ -25,26 +24,15 @@ describe('sessão', () => {
   it('recusa senha errada', async () => {
     const { status, body } = await t.call('POST', '/api/login', { password: 'errada' });
     expect(status).toBe(401);
-    expect(body.error).toBe('Senha incorreta.');
-    expect((await t.call('GET', '/api/session')).body).toEqual({ authenticated: false });
+    expect(body).toEqual({ error: 'Senha incorreta.' });
   });
 
-  it('entra com a senha certa e recebe um cookie protegido', async () => {
-    const { status, response } = await t.login();
+  it('entra com a senha certa e recebe um token que abre a API', async () => {
+    const { status, body } = await t.login();
     expect(status).toBe(200);
-    const cookie = response.headers.get('set-cookie')!;
-    expect(cookie).toMatch(/^boldo_session=/);
-    expect(cookie).toMatch(/HttpOnly/);
-    expect(cookie).toMatch(/SameSite=Strict/);
+    expect(body.token).toMatch(/^\d+\.[\w-]+$/);
     expect((await t.call('GET', '/api/session')).body).toEqual({ authenticated: true });
     expect((await t.call('GET', '/api/medicines')).status).toBe(200);
-  });
-
-  it('sair encerra a sessão', async () => {
-    await t.login();
-    await t.call('POST', '/api/logout');
-    t.forgetSession();
-    expect((await t.call('GET', '/api/medicines')).status).toBe(401);
   });
 
   it('a sessão expira depois de 180 dias', async () => {
@@ -55,41 +43,21 @@ describe('sessão', () => {
     expect((await t.call('GET', '/api/session')).body).toEqual({ authenticated: false });
   });
 
-  it('trocar a senha derruba as sessões abertas', async () => {
-    const { response } = await t.login();
-    const cookie = response.headers.get('set-cookie')!.split(';')[0];
-
-    const withNewPassword = createApp({
-      store: t.store,
-      sender: t.sender,
-      password: 'senha-nova',
-      sessionSecret: 'segredo-de-teste',
-      timezone: 'UTC',
-      vapidPublicKey: '',
-    });
-    const result = await withNewPassword.request('/api/medicines', { headers: { Cookie: cookie } });
-    expect(result.status).toBe(401);
-  });
-
-  it('recusa cookie adulterado', async () => {
-    await t.login();
-    const farFuture = String(Date.parse('2099-01-01'));
-    const result = await t.call('GET', '/api/session');
-    expect(result.body).toEqual({ authenticated: true });
-
-    const { store, sender } = t;
-    const app = createApp({
-      store,
-      sender,
-      password: PASSWORD,
-      sessionSecret: 'segredo-de-teste',
-      timezone: 'UTC',
-      vapidPublicKey: '',
-    });
-    const forged = await app.request('/api/medicines', {
-      headers: { Cookie: `boldo_session=${farFuture}.assinatura-falsa` },
-    });
-    expect(forged.status).toBe(401);
+  it('recusa token adulterado, de outra senha ou malformado', async () => {
+    const { body } = await t.login();
+    const [expires, signature] = body.token.split('.');
+    const forged = [
+      `${Number(expires) + 1}.${signature}`, // validade esticada
+      `${expires}.${signature.slice(0, -2)}xx`,
+      testTokens('outra-senha').session(Number(expires)), // trocar a senha derruba as sessões
+      `${expires}`,
+      `${expires}.${signature}.extra`,
+      'qualquer-coisa',
+    ];
+    for (const token of forged) {
+      t.useToken(token);
+      expect((await t.call('GET', '/api/medicines')).status, token).toBe(401);
+    }
   });
 
   it('bloqueia depois de muitas senhas erradas e libera após 15 minutos', async () => {
@@ -102,6 +70,107 @@ describe('sessão', () => {
 
     t.clock.now = new Date(t.clock.now.getTime() + 16 * 60_000);
     expect((await t.login()).status).toBe(200);
+  });
+
+  it('acertar a senha zera a contagem de erros', async () => {
+    for (let i = 0; i < 7; i += 1) await t.call('POST', '/api/login', { password: 'errada' });
+    expect((await t.login()).status).toBe(200);
+    for (let i = 0; i < 7; i += 1) await t.call('POST', '/api/login', { password: 'errada' });
+    expect((await t.login()).status).toBe(200);
+  });
+});
+
+describe('app servido de outro endereço (CORS)', () => {
+  it('libera a origem configurada, com o cabeçalho de sessão', async () => {
+    const { response } = await t.call('OPTIONS', '/api/medicines', undefined, {
+      Origin: 'https://app.example',
+      'Access-Control-Request-Method': 'GET',
+      'Access-Control-Request-Headers': 'authorization',
+    });
+    expect(response.status).toBe(204);
+    expect(response.headers.get('access-control-allow-origin')).toBe('https://app.example');
+    expect(response.headers.get('access-control-allow-headers')).toMatch(/Authorization/);
+  });
+
+  it('não libera outras origens', async () => {
+    const { response } = await t.call('GET', '/api/health', undefined, {
+      Origin: 'https://outro.example',
+    });
+    expect(response.headers.get('access-control-allow-origin')).toBeNull();
+  });
+});
+
+describe('botão "Tomei" da notificação', () => {
+  const setup = async () => {
+    await t.login();
+    const { body } = await t.call(
+      'POST',
+      '/api/medicines',
+      input({ quantity: 10, schedules: [{ time: '08:00', days: everyDay, dose: 1 }] }),
+    );
+    t.useToken(''); // o service worker não tem a sessão
+    const scheduleId: number = body.schedules[0].id;
+    return { scheduleId, token: t.tokens.dose(scheduleId, '2026-10-12') };
+  };
+
+  it('registra a dose só com o token que foi no lembrete', async () => {
+    const { scheduleId, token } = await setup();
+    const taken = await t.call('POST', '/api/push-action/take', {
+      scheduleId,
+      date: '2026-10-12',
+      token,
+    });
+    expect(taken.status).toBe(200);
+    expect((await t.store.getMedicine(1))!.quantity).toBe(9);
+  });
+
+  it('o token não serve para outra dose nem para outro dia', async () => {
+    const { scheduleId, token } = await setup();
+    const attempts = [
+      { scheduleId, date: '2026-10-11', token },
+      { scheduleId: scheduleId + 1, date: '2026-10-12', token },
+      { scheduleId, date: '2026-10-12', token: 'inventado' },
+      { scheduleId, date: '2026-10-12' },
+    ];
+    for (const body of attempts) {
+      expect((await t.call('POST', '/api/push-action/take', body)).status).toBe(401);
+    }
+    expect((await t.store.getMedicine(1))!.quantity).toBe(10);
+  });
+
+  it('lembrete velho demais não vale mais', async () => {
+    const { scheduleId, token } = await setup();
+    t.clock.now = new Date('2026-10-14T11:00:00Z');
+    const late = await t.call('POST', '/api/push-action/take', {
+      scheduleId,
+      date: '2026-10-12',
+      token,
+    });
+    expect(late.status).toBe(400);
+  });
+});
+
+describe('cron externo', () => {
+  it('só roda o agendador com o segredo certo', async () => {
+    expect((await t.call('POST', '/api/tick')).status).toBe(401);
+    t.useToken('segredo-errado');
+    expect((await t.call('POST', '/api/tick')).status).toBe(401);
+    // Uma sessão de usuário não é o segredo do cron.
+    await t.login();
+    expect((await t.call('POST', '/api/tick')).status).toBe(401);
+  });
+
+  it('envia os lembretes que estão na hora e conta quantos foram', async () => {
+    await t.login();
+    await t.call(
+      'POST',
+      '/api/medicines',
+      input({ schedules: [{ time: '08:00', days: everyDay, dose: 1 }] }),
+    );
+    t.useToken(CRON_SECRET);
+    expect((await t.call('POST', '/api/tick')).body).toEqual({ sent: 1 });
+    expect((await t.call('POST', '/api/tick')).body).toEqual({ sent: 0 });
+    expect(t.sender.sent[0].title).toBe('Hora de tomar Dipirona');
   });
 });
 
@@ -289,7 +358,7 @@ describe('ajustes e notificações', () => {
     expect(body.medicines).toHaveLength(1);
     expect(body.settings).toEqual({ expiryWarnDays: 30, alertTime: '09:00' });
     // As chaves de push e o segredo de sessão nunca saem no export.
-    expect(JSON.stringify(body)).not.toMatch(/vapid|sessionSecret/i);
+    expect(JSON.stringify(body)).not.toMatch(/vapid|secret/i);
   });
 
   it('rota desconhecida da API responde 404 em JSON', async () => {
