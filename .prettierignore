@@ -1,0 +1,9 @@
+dist
+dist-server
+dev-dist
+data
+playwright-report
+test-results
+package-lock.json
+public/icons
+.e2e-data

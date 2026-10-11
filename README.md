@@ -1,0 +1,157 @@
+# Boldo
+
+A farmacinha de casa: o que tem, quanto resta, para que serve e a hora de tomar.
+
+Boldo é um app web instalável (PWA) para uma casa só. Os dados ficam em um banco no
+servidor, então o celular, o tablet e o computador mostram sempre a mesma farmacinha.
+O acesso é por uma senha única, sem cadastro de usuários.
+
+| Celular                                                       | Tablet                                                      | Desktop                                                     |
+| ------------------------------------------------------------- | ----------------------------------------------------------- | ----------------------------------------------------------- |
+| ![Hoje no celular](docs/screenshots/celular-hoje.png)         | ![Remédios no tablet](docs/screenshots/tablet-remedios.png) | ![Hoje no desktop](docs/screenshots/desktop-hoje.png)       |
+| ![Remédios no celular](docs/screenshots/celular-remedios.png) | ![Detalhe no tablet](docs/screenshots/tablet-detalhe.png)   | ![Detalhe no desktop](docs/screenshots/desktop-detalhe.png) |
+
+## O que ele faz
+
+- **Remédios**: nome, dosagem, para que serve, quantidade, unidade (comprimidos, cápsulas,
+  mL, gotas…), validade e anotações livres.
+- **Estoque**: botões de mais e menos para ajustar na hora. Quando há horários cadastrados,
+  mostra para quantos dias o estoque dá.
+- **Hoje**: as doses do dia em ordem de horário. "Tomei" registra a dose e já desconta do
+  estoque; "Pular" e "Desfazer" também existem.
+- **Lembretes por notificação**:
+  - na hora de tomar cada dose (com botão "Tomei" na própria notificação, onde o sistema
+    permite);
+  - quando um remédio está acabando ou acabou;
+  - quando a validade está chegando (30 dias antes, configurável) e quando vence.
+- **Tarja de estado**: a faixa colorida de cada remédio resume a situação. Verde está em
+  ordem, mostarda pede atenção (acabando ou vencendo), vermelha é acabou ou venceu.
+- **Instalável** no celular, tablet e computador, e abre mesmo sem internet (os dados
+  precisam de conexão).
+- **Cópia dos dados** em JSON, em Ajustes.
+
+## Como rodar
+
+O Boldo é um único serviço: um servidor Node que entrega o app, a API e os lembretes, com
+um arquivo SQLite. Precisa de **Node 24** ou de Docker.
+
+### Com Docker (recomendado)
+
+```bash
+cp .env.example .env        # edite e troque ADMIN_PASSWORD
+docker compose up -d --build
+```
+
+O app fica em `http://localhost:3210`. O banco mora no volume `boldo-data`.
+
+### Com Node
+
+```bash
+npm ci
+cp .env.example .env        # edite e troque ADMIN_PASSWORD
+npm run build
+npm start
+```
+
+### HTTPS é obrigatório fora do `localhost`
+
+Os navegadores só deixam **instalar** o app e **receber notificações** em páginas HTTPS
+(ou em `localhost`). Para usar no celular, publique o Boldo atrás de algo que entregue
+HTTPS com certificado válido, por exemplo:
+
+- [Tailscale Serve](https://tailscale.com/kb/1312/serve) (só os seus aparelhos acessam);
+- [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/);
+- um proxy reverso como Caddy ou Nginx com Let's Encrypt.
+
+Atrás de um proxy que envia `X-Forwarded-For`, defina `TRUST_PROXY=1` para o limite de
+tentativas de senha contar por visitante.
+
+## Lembretes
+
+1. Abra **Ajustes** e toque em **Ativar lembretes**. Faça isso em cada aparelho em que
+   quiser ser avisado.
+2. Use **Enviar um teste** para conferir.
+3. Cadastre os **horários para tomar** em cada remédio. Sem horário, não há lembrete de dose.
+
+Como funciona: o servidor confere a cada 30 segundos o que está na hora e envia pelo padrão
+Web Push. Por isso os lembretes chegam com o app fechado, e por isso o servidor precisa
+estar ligado e com acesso à internet.
+
+- **iPhone e iPad**: as notificações só funcionam com o app instalado (Compartilhar →
+  "Adicionar à Tela de Início") e aberto por esse ícone. Exige iOS 16.4 ou mais novo.
+- Os horários valem no fuso do servidor (`TZ`, padrão `America/Sao_Paulo`).
+- Avisos de estoque e validade saem entre o horário configurado em Ajustes (padrão 09:00)
+  e 21:00. Cada aviso sai uma vez; repor o estoque ou corrigir a validade rearma o aviso.
+- Se o servidor estava fora do ar na hora da dose, o lembrete ainda sai se ele voltar em
+  até uma hora.
+
+## Configuração
+
+Tudo por variáveis de ambiente (veja [.env.example](.env.example)):
+
+| Variável         | Padrão                           | Para que serve                                                    |
+| ---------------- | -------------------------------- | ----------------------------------------------------------------- |
+| `ADMIN_PASSWORD` | (obrigatória)                    | A senha única de acesso. Trocar a senha encerra todas as sessões. |
+| `PORT`           | `3210`                           | Porta HTTP.                                                       |
+| `TZ`             | `America/Sao_Paulo`              | Fuso dos horários de dose e dos avisos.                           |
+| `DATA_DIR`       | `./data`                         | Pasta do banco `boldo.db`.                                        |
+| `VAPID_SUBJECT`  | `mailto:boldo@localhost.invalid` | Contato enviado aos serviços de push. Use um e-mail seu.          |
+| `TRUST_PROXY`    | `0`                              | `1` se houver proxy reverso enviando `X-Forwarded-For`.           |
+
+As chaves de push (VAPID) e o segredo de sessão são gerados na primeira execução e ficam
+no banco. **Backup = copiar `boldo.db`** (ou baixar a cópia em JSON pelos Ajustes).
+
+## Desenvolvimento
+
+```bash
+npm ci
+cp .env.example .env
+npm run dev                 # API em :3210 e Vite em :5173 (abra o :5173)
+```
+
+Para ter dados de exemplo: `ADMIN_PASSWORD=<sua senha> node scripts/seed.mjs`.
+
+O service worker (instalação, offline e notificações) só existe no build de produção:
+use `npm run build && npm start` para testar essas partes.
+
+| Comando            | O que faz                                                          |
+| ------------------ | ------------------------------------------------------------------ |
+| `npm run dev`      | Servidor e front-end com recarga automática.                       |
+| `npm run build`    | Gera `dist/` (app) e `dist-server/` (servidor).                    |
+| `npm start`        | Roda o build de produção.                                          |
+| `npm test`         | Testes unitários (Vitest).                                         |
+| `npm run test:e2e` | Testes de ponta a ponta (Playwright) em desktop, celular e tablet. |
+| `npm run check`    | Tipos, lint, formatação e testes unitários.                        |
+| `npm run icons`    | Regenera os ícones do PWA.                                         |
+
+Na primeira vez, instale o navegador dos testes E2E: `npx playwright install chromium`.
+
+## Testes
+
+- **Unitários** (`tests/unit`): regras de estoque e validade, datas e fusos, validação,
+  banco de dados, API (sessão, limites de tentativa, cadastro, doses), agendador de
+  lembretes e a lógica das notificações.
+- **E2E** (`tests/e2e`): o app de produção de verdade em três tamanhos de tela. Cobre
+  entrar e sair, cadastro completo, ajuste de estoque, edição com horários, exclusão,
+  busca e filtros, doses do dia, manifesto e ícones do PWA, uso offline e a montagem da
+  notificação no service worker.
+
+O que os testes **não** cobrem: a entrega real do push pelo serviço do navegador (Google,
+Apple, Mozilla) até um aparelho. Para isso, use "Enviar um teste" em Ajustes.
+
+## Como é por dentro
+
+```
+shared/   Regras puras usadas pelo servidor e pelo app (estoque, validade, datas, validação)
+server/   API (Hono), SQLite (node:sqlite), Web Push e o agendador de lembretes
+src/      App React + service worker
+tests/    unit/ (Vitest) e e2e/ (Playwright)
+scripts/  Ícones, dados de exemplo e capturas de tela
+```
+
+Detalhes de arquitetura, convenções e armadilhas estão em [AGENTS.md](AGENTS.md), escrito
+para pessoas e para agentes de IA que forem mexer no código.
+
+## Licença
+
+[MIT](LICENSE)
