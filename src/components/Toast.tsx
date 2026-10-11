@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
+import { Icon } from './Icon';
 
 type Notify = (message: string, tone?: 'ok' | 'error') => void;
 
@@ -9,9 +10,13 @@ export function useToast(): Notify {
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toast, setToast] = useState<{ message: string; tone: 'ok' | 'error'; key: number } | null>(
-    null,
-  );
+  const [toast, setToast] = useState<{
+    message: string;
+    tone: 'ok' | 'error';
+    key: number;
+    /** O aviso está saindo: fica na tela só o tempo da animação. */
+    leaving?: boolean;
+  } | null>(null);
   const area = useRef<HTMLDivElement>(null);
   const timer = useRef<number | undefined>(undefined);
 
@@ -33,8 +38,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     raise(true);
     timer.current = window.setTimeout(
       () => {
-        setToast(null);
-        raise(false);
+        setToast((current) => current && { ...current, leaving: true });
+        timer.current = window.setTimeout(() => {
+          setToast(null);
+          raise(false);
+        }, 180);
       },
       tone === 'error' ? 6000 : 3200,
     );
@@ -45,7 +53,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div ref={area} className="toast-area" popover="manual" role="status" aria-live="polite">
         {toast && (
-          <div key={toast.key} className="toast" data-tone={toast.tone}>
+          <div
+            key={toast.key}
+            className="toast"
+            data-tone={toast.tone}
+            data-saindo={toast.leaving || undefined}
+          >
+            <Icon name={toast.tone === 'error' ? 'alert' : 'check'} size={18} />
             {toast.message}
           </div>
         )}

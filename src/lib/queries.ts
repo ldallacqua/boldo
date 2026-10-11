@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { healthOf, type MedicineHealth } from '../../shared/status';
 import { localNow } from '../../shared/time';
-import type { Medicine, MedicineInput, Settings } from '../../shared/types';
+import { doseStatus } from '../../shared/schedule';
+import type { Medicine, MedicineInput, Settings, TodayResponse } from '../../shared/types';
 import { api, type DoseAction } from './api';
 
 export function useSession() {
@@ -71,10 +72,34 @@ export function useAdjustQuantity(id: number) {
 }
 
 export function useDoseAction() {
+  const client = useQueryClient();
   const refresh = useRefreshStock();
   return useMutation({
     mutationFn: (vars: { scheduleId: number; action: DoseAction; date: string }) =>
       api.dose(vars.scheduleId, vars.action, vars.date),
+    // A dose muda na tela no mesmo instante do toque; o refetch confirma (ou desfaz, se o
+    // servidor recusar).
+    onMutate: async ({ scheduleId, action }) => {
+      await client.cancelQueries({ queryKey: ['today'] });
+      client.setQueryData<TodayResponse>(['today'], (today) =>
+        today
+          ? {
+              ...today,
+              doses: today.doses.map((dose) =>
+                dose.scheduleId !== scheduleId
+                  ? dose
+                  : action === 'undo'
+                    ? { ...dose, status: doseStatus(dose.time, today.time, null), recordedAt: null }
+                    : {
+                        ...dose,
+                        status: action === 'take' ? 'taken' : 'skipped',
+                        recordedAt: new Date().toISOString(),
+                      },
+              ),
+            }
+          : today,
+      );
+    },
     onSettled: refresh,
   });
 }

@@ -232,3 +232,60 @@ test('abrir um remédio que não existe explica o que houve', async ({ page }) =
   await page.goto('/remedios/999999');
   await expect(page.getByRole('dialog')).toContainText('Remédio não encontrado');
 });
+
+test('no celular, arrastar o painel para baixo fecha; um puxão curto não', async ({
+  page,
+}, info) => {
+  test.skip((page.viewportSize()?.width ?? 0) >= 720, 'Só o painel do celular é arrastável.');
+  const medicine = await createMedicine(page, { name: unique(info, 'Arrasta') });
+  await page.goto(`/remedios/${medicine.id}`);
+  const sheet = page.getByRole('dialog');
+  const title = (await sheet.getByRole('heading', { name: medicine.name }).boundingBox())!;
+  const x = title.x + title.width / 2;
+  const y = title.y + title.height / 2;
+  const pull = async (distance: number) => {
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y + distance / 2, { steps: 5 });
+    await page.mouse.move(x, y + distance, { steps: 5 });
+    // Parado um instante antes de soltar: fecha pela distância, não pela velocidade.
+    await page.waitForTimeout(120);
+    await page.mouse.move(x, y + distance);
+    await page.mouse.up();
+  };
+
+  await pull(40);
+  await expect(sheet.getByRole('link', { name: 'Editar' })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/remedios/${medicine.id}$`));
+
+  await pull(260);
+  await expect(sheet).toHaveCount(0);
+  await expect(page).toHaveURL(/\/remedios$/);
+});
+
+test('com movimento reduzido no sistema, o painel abre e fecha sem animação', async ({
+  page,
+}, info) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const medicine = await createMedicine(page, { name: unique(info, 'Calmo') });
+  await page.goto('/remedios');
+  await row(page, medicine.name).click();
+  const sheet = page.getByRole('dialog');
+  await expect(sheet.getByRole('link', { name: 'Editar' })).toBeVisible();
+  // Nada fica se mexendo no relógio da página (o fio do cabeçalho segue a rolagem, não o tempo).
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document
+            .getAnimations()
+            .filter(
+              (animation) =>
+                animation.timeline === document.timeline && animation.playState === 'running',
+            ).length,
+      ),
+    )
+    .toBe(0);
+  await sheet.getByRole('button', { name: 'Fechar' }).click();
+  await expect(sheet).toHaveCount(0);
+});

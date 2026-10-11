@@ -1,10 +1,33 @@
 import type { ReactNode } from 'react';
+import { Mark } from './Icon';
 import { Mascote, type Pose } from './Mascote';
 
-export function Loading({ label = 'Carregando' }: { label?: string }) {
+/**
+ * Enquanto os dados chegam, a tela mostra o contorno do que vem: um título e algumas
+ * caixinhas. `variant="marca"` é para a abertura do app, antes de saber se há sessão.
+ */
+export function Loading({
+  label = 'Carregando',
+  variant = 'lista',
+}: {
+  label?: string;
+  variant?: 'lista' | 'marca';
+}) {
+  if (variant === 'marca') {
+    return (
+      <div className="abrindo" role="status">
+        <Mark size={72} />
+        <span className="so-leitor">{label}</span>
+      </div>
+    );
+  }
   return (
-    <div className="carregando" role="status">
-      <span className="carregando-ponto" />
+    <div className="esqueleto" role="status">
+      <span className="esqueleto-titulo" />
+      <span className="esqueleto-linha" />
+      <span className="esqueleto-caixa" />
+      <span className="esqueleto-caixa" />
+      <span className="esqueleto-caixa" />
       <span className="so-leitor">{label}</span>
     </div>
   );

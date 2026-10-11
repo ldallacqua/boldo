@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'wouter';
+import { Link } from 'wouter';
 import {
   formatDays,
   formatExpiry,
@@ -11,6 +11,7 @@ import {
 import type { MedicineHealth } from '../../shared/status';
 import type { Medicine } from '../../shared/types';
 import { useDeviceAlerts } from '../lib/device';
+import { haptic } from '../lib/motion';
 import { useAdjustQuantity, useDeleteMedicine } from '../lib/queries';
 import { Badges } from './Badges';
 import { Icon } from './Icon';
@@ -28,19 +29,26 @@ function expirySentence(medicine: Medicine, health: MedicineHealth): string {
 export function MedicineDetail({
   medicine,
   health,
+  onDeleted,
 }: {
   medicine: Medicine;
   health: MedicineHealth;
+  /** Chamado depois de excluir: quem abriu o painel é quem o fecha. */
+  onDeleted: () => void;
 }) {
-  const [, navigate] = useLocation();
   const [confirming, setConfirming] = useState(false);
   const adjust = useAdjustQuantity(medicine.id);
   const remove = useDeleteMedicine();
   const toast = useToast();
   const alerts = useDeviceAlerts();
 
-  const change = (delta: number) =>
+  // Para que lado o número rola: para cima ao pôr, para baixo ao tirar.
+  const [direction, setDirection] = useState<'sobe' | 'desce'>('sobe');
+  const change = (delta: number) => {
+    setDirection(delta > 0 ? 'sobe' : 'desce');
+    haptic(4);
     adjust.mutate(delta, { onError: (error) => toast(error.message, 'error') });
+  };
 
   // mutateAsync: o painel sai da tela junto com o remédio, e callbacks de mutate() não
   // rodariam depois disso.
@@ -48,7 +56,7 @@ export function MedicineDetail({
     try {
       await remove.mutateAsync(medicine.id);
       toast('Remédio excluído');
-      navigate('/remedios');
+      onDeleted();
     } catch (error) {
       toast((error as Error).message, 'error');
     }
@@ -81,8 +89,10 @@ export function MedicineDetail({
             <Icon name="minus" size={26} />
           </button>
           <p className="estoque-valor" aria-live="polite">
-            <span className="numeros" data-testid="quantidade">
-              {formatNumber(medicine.quantity)}
+            <span className="numeros estoque-numero">
+              <span key={medicine.quantity} data-rola={direction} data-testid="quantidade">
+                {formatNumber(medicine.quantity)}
+              </span>
             </span>
             <span>{unitLabel(medicine.unit, medicine.quantity)} em casa</span>
           </p>
@@ -139,6 +149,7 @@ export function MedicineDetail({
         <label className="avisado avisado-so">
           <input
             type="checkbox"
+            role="switch"
             checked={alerts.notifies(medicine.id)}
             onChange={(e) =>
               alerts

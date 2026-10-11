@@ -91,7 +91,17 @@ test('no formulário, nenhum campo invade o vizinho', async ({ page }, info) => 
   const findProblems = () =>
     page.evaluate(async () => {
       // O painel entra deslizando; medir no meio do caminho dá posições que não valem.
-      await Promise.all(document.getAnimations().map((animation) => animation.finished));
+      // As que têm fim: as contínuas (o Boldinho flutuando) e as presas à rolagem não acabam.
+      await Promise.all(
+        document
+          .getAnimations()
+          .filter(
+            (animation) =>
+              animation.timeline === document.timeline &&
+              animation.effect?.getComputedTiming().iterations !== Infinity,
+          )
+          .map((animation) => animation.finished),
+      );
       const form = document.querySelector('form.formulario')!;
       const bounds = form.getBoundingClientRect();
       const label = (el: Element) =>

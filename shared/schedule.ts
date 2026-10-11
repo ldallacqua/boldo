@@ -1,5 +1,5 @@
 import { minutesOf, type LocalNow } from './time';
-import type { DoseStatus, Schedule } from './types';
+import type { DoseStatus, DoseToday, Schedule } from './types';
 
 /** Depois de quantos minutos uma dose não registrada passa a contar como atrasada. */
 export const LATE_AFTER_MINUTES = 30;
@@ -29,4 +29,30 @@ export function isReminderDue(
   if (!isScheduledOn(schedule, now.weekday)) return false;
   const elapsed = minutesOf(now.time) - minutesOf(schedule.time);
   return elapsed >= 0 && elapsed <= graceMinutes;
+}
+
+export interface DayProgress {
+  total: number;
+  /** Tomadas ou puladas: as que não pedem mais nada da pessoa. */
+  done: number;
+  taken: number;
+  /** A dose em aberto que vem primeiro: a atrasada mais antiga, ou a próxima do dia. */
+  next: Pick<DoseToday, 'scheduleId' | 'time' | 'status'> | null;
+  /** Minutos até a hora de `next`; zero se ela já chegou. */
+  minutesToNext: number;
+}
+
+/** O resumo do dia para a tela Hoje. `doses` vem em ordem de horário. */
+export function dayProgress(
+  doses: readonly Pick<DoseToday, 'scheduleId' | 'time' | 'status'>[],
+  nowTime: string,
+): DayProgress {
+  const next = doses.find((dose) => dose.status === 'late' || dose.status === 'pending') ?? null;
+  return {
+    total: doses.length,
+    done: doses.filter((dose) => dose.status === 'taken' || dose.status === 'skipped').length,
+    taken: doses.filter((dose) => dose.status === 'taken').length,
+    next,
+    minutesToNext: next ? Math.max(0, minutesOf(next.time) - minutesOf(nowTime)) : 0,
+  };
 }

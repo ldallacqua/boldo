@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { Link } from 'wouter';
 import { formatExpiry, formatNumber, unitLabel } from '../../shared/format';
 import type { MedicineHealth } from '../../shared/status';
@@ -7,13 +8,15 @@ import { Badges } from './Badges';
 interface MedicineRowProps {
   medicine: Medicine;
   health: MedicineHealth;
+  /** Posição na lista: as linhas entram uma depois da outra. */
+  index?: number;
 }
 
 /** Uma "caixinha" da lista: tarja de estado, nome, para que serve e quanto tem. */
-export function MedicineRow({ medicine, health }: MedicineRowProps) {
+export function MedicineRow({ medicine, health, index = 0 }: MedicineRowProps) {
   const times = medicine.schedules.map((s) => s.time);
   return (
-    <li>
+    <li style={{ '--i': index } as CSSProperties}>
       <Link href={`/remedios/${medicine.id}`} className="caixa" data-tone={health.tone}>
         <div className="caixa-principal">
           <p className="caixa-nome">

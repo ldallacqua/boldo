@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useOnline } from '../lib/useOnline';
 import { Icon, Mark, type IconName } from './Icon';
@@ -17,6 +17,7 @@ function isActive(href: string, path: string): boolean {
 export function Shell({ children }: { children: ReactNode }) {
   const [path] = useLocation();
   const online = useOnline();
+  const active = NAV.findIndex((item) => isActive(item.href, path));
 
   return (
     <div className="shell">
@@ -25,7 +26,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <Mark size={40} />
           <span className="nav-nome">Boldo</span>
         </Link>
-        <ul className="nav-lista">
+        <ul className="nav-lista" style={{ '--ativo': active } as CSSProperties}>
           {NAV.map((item) => (
             <li key={item.href}>
               <Link
@@ -38,6 +39,8 @@ export function Shell({ children }: { children: ReactNode }) {
               </Link>
             </li>
           ))}
+          {/* A tarja de "você está aqui": uma só, que desliza de um item para o outro. */}
+          {active >= 0 && <li className="nav-tarja" aria-hidden="true" />}
         </ul>
       </nav>
 

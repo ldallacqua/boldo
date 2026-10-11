@@ -69,15 +69,37 @@ test('registra a dose, desconta do estoque e desfaz', async ({ page }, info) => 
   await dose.getByRole('button', { name: /^Tomei/ }).click();
   await expect(dose).toContainText(/Tomado às \d{2}:\d{2}/);
   await expect(dose.getByRole('button', { name: /^Tomei/ })).toHaveCount(0);
-  expect(await stock()).toBe(8);
+  // A tela muda no toque, antes de o servidor responder: o estoque é conferido com espera.
+  await expect.poll(stock).toBe(8);
 
   await dose.getByRole('button', { name: /^Desfazer/ }).click();
   await expect(dose.getByRole('button', { name: /^Tomei/ })).toBeVisible();
-  expect(await stock()).toBe(10);
+  await expect.poll(stock).toBe(10);
 
   await dose.getByRole('button', { name: /^Pular/ }).click();
   await expect(dose).toContainText('Pulado');
-  expect(await stock()).toBe(10);
+  await expect.poll(stock).toBe(10);
+});
+
+test('o anel do dia acompanha as doses registradas', async ({ page }, info) => {
+  const medicine = await createMedicine(page, {
+    name: unique(info, 'Anel'),
+    schedules: [{ time: '00:02', days: everyDay, dose: 1 }],
+  });
+  await page.goto('/');
+  const ring = page.getByRole('img', { name: /de \d+ doses registradas/ });
+  const done = async () => Number((await ring.getAttribute('aria-label'))!.split(' ')[0]);
+  const before = await done();
+
+  const dose = page.getByRole('listitem').filter({ hasText: medicine.name });
+  await dose.getByRole('button', { name: /^Tomei/ }).click();
+  await expect.poll(done).toBe(before + 1);
+  // Continua valendo depois de o servidor confirmar.
+  await page.reload();
+  await expect.poll(done).toBe(before + 1);
+
+  await dose.getByRole('button', { name: /^Desfazer/ }).click();
+  await expect.poll(done).toBe(before);
 });
 
 test('tomar a última dose faz o remédio aparecer como acabado', async ({ page }, info) => {

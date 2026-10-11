@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { formatWait } from '../../shared/format';
+import { dayProgress } from '../../shared/schedule';
 import {
   attentionReasons,
   formatDays,
@@ -87,5 +89,51 @@ describe('attentionReasons', () => {
         '2026-09',
       ),
     ).toEqual(['Acabando: restam 2 comprimidos', 'Venceu em 09/2026']);
+  });
+});
+
+describe('formatWait', () => {
+  it('diz quanto falta em minutos e horas', () => {
+    expect(formatWait(0)).toBe('agora');
+    expect(formatWait(-5)).toBe('agora');
+    expect(formatWait(35)).toBe('em 35 min');
+    expect(formatWait(120)).toBe('em 2 h');
+    expect(formatWait(130)).toBe('em 2 h 10 min');
+  });
+});
+
+describe('dayProgress', () => {
+  const dose = (
+    scheduleId: number,
+    time: string,
+    status: 'pending' | 'late' | 'taken' | 'skipped',
+  ) => ({
+    scheduleId,
+    time,
+    status,
+  });
+
+  it('conta as registradas e aponta a próxima em aberto', () => {
+    const progress = dayProgress(
+      [dose(1, '08:00', 'taken'), dose(2, '12:30', 'skipped'), dose(3, '20:00', 'pending')],
+      '17:45',
+    );
+    expect(progress).toMatchObject({ total: 3, done: 2, taken: 1, minutesToNext: 135 });
+    expect(progress.next?.scheduleId).toBe(3);
+  });
+
+  it('a atrasada mais antiga vem antes da próxima do dia, e não tem espera', () => {
+    const progress = dayProgress([dose(1, '08:00', 'late'), dose(2, '20:00', 'pending')], '10:00');
+    expect(progress.next?.scheduleId).toBe(1);
+    expect(progress.minutesToNext).toBe(0);
+  });
+
+  it('sem doses em aberto não há próxima', () => {
+    expect(dayProgress([dose(1, '08:00', 'taken')], '09:00')).toMatchObject({
+      total: 1,
+      done: 1,
+      next: null,
+    });
+    expect(dayProgress([], '09:00')).toMatchObject({ total: 0, done: 0, next: null });
   });
 });

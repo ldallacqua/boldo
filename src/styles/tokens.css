@@ -30,6 +30,8 @@
   --vermelho-fundo: #f3d8cd;
 
   --tinta-fraca: #7d8a80;
+  /* O botão do interruptor é claro nos dois temas. */
+  --interruptor-botao: #fffdf6;
   --veu: rgb(23 39 29 / 0.5);
 
   /* A lateral das telas largas é sempre escura, nos dois temas. */
@@ -67,6 +69,48 @@
 
   --tarja: 6px;
   --sombra-folha: 0 18px 50px -12px rgb(28 56 41 / 0.35);
+  /* Sombras em duas camadas, tingidas de verde: a de perto dá a borda, a de longe o volume. */
+  --sombra-1: 0 1px 2px rgb(28 56 41 / 0.06), 0 2px 8px -2px rgb(28 56 41 / 0.06);
+  --sombra-2: 0 1px 2px rgb(28 56 41 / 0.08), 0 10px 24px -8px rgb(28 56 41 / 0.16);
+  --sombra-3: 0 2px 4px rgb(28 56 41 / 0.08), 0 24px 56px -16px rgb(28 56 41 / 0.3);
+
+  /*
+   * Movimento. Tudo o que responde a um toque dura menos de 300 ms e desacelera no fim
+   * (começa rápido, para a tela parecer que respondeu na hora). `--mola` passa um pouco do
+   * ponto e volta: só para o que comemora ou confirma (dose tomada, interruptor).
+   */
+  --rapido: 120ms;
+  --medio: 200ms;
+  --lento: 320ms;
+  --sai: cubic-bezier(0.22, 1, 0.36, 1);
+  --vai-e-volta: cubic-bezier(0.65, 0, 0.35, 1);
+  --mola: linear(
+    0,
+    0.009,
+    0.035 2.1%,
+    0.141 4.4%,
+    0.723 12.9%,
+    0.938 16.7%,
+    1.017,
+    1.077,
+    1.121,
+    1.149 24.3%,
+    1.159,
+    1.163,
+    1.161,
+    1.154 29.9%,
+    1.129 32.8%,
+    1.051 39.6%,
+    1.017 43.1%,
+    0.991,
+    0.977 51%,
+    0.974 53.8%,
+    0.975 57.1%,
+    0.997 69.8%,
+    1.003 76.9%,
+    1.004 83.8%,
+    1
+  );
 
   --nav-altura: 64px;
   --trilho: 88px;
@@ -104,4 +148,7 @@
 
   --nav-fundo: #0b110d;
   --sombra-folha: 0 18px 50px -12px rgb(0 0 0 / 0.6);
+  --sombra-1: 0 1px 2px rgb(0 0 0 / 0.3);
+  --sombra-2: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 24px -8px rgb(0 0 0 / 0.5);
+  --sombra-3: 0 2px 4px rgb(0 0 0 / 0.3), 0 24px 56px -16px rgb(0 0 0 / 0.7);
 }

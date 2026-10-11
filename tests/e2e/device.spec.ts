@@ -18,8 +18,8 @@ test('o tema escuro vale para o aparelho e continua depois de recarregar', async
   await expect(html).toHaveAttribute('data-theme', 'dark');
   await expect(page.getByRole('radio', { name: 'Escuro' })).toBeChecked();
 
-  // Em "Como o aparelho", quem manda é o sistema.
-  await page.getByRole('radio', { name: 'Como o aparelho' }).check();
+  // Em "Automático", quem manda é o sistema.
+  await page.getByRole('radio', { name: 'Automático' }).check();
   await expect(html).toHaveAttribute('data-theme', 'light');
   await page.emulateMedia({ colorScheme: 'dark' });
   await expect(html).toHaveAttribute('data-theme', 'dark');
@@ -36,7 +36,17 @@ test('o texto continua legível no tema escuro', async ({ page }, info) => {
     await expect(page.getByRole('navigation', { name: 'Principal' })).toBeVisible();
     // Contraste (WCAG) entre cada texto visível e o fundo sólido mais próximo atrás dele.
     const weak = await page.evaluate(async () => {
-      await Promise.all(document.getAnimations().map((animation) => animation.finished));
+      // As que têm fim: as contínuas (o Boldinho flutuando) e as presas à rolagem não acabam.
+      await Promise.all(
+        document
+          .getAnimations()
+          .filter(
+            (animation) =>
+              animation.timeline === document.timeline &&
+              animation.effect?.getComputedTiming().iterations !== Infinity,
+          )
+          .map((animation) => animation.finished),
+      );
       const rgb = (value: string) => (value.match(/[\d.]+/g) ?? []).map(Number);
       const luminance = ([r = 0, g = 0, b = 0]: number[]) => {
         const [x, y, z] = [r, g, b].map((v) => {

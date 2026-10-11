@@ -57,10 +57,12 @@ src/
   components/        Shell (navegação), Sheet (painel modal), MedicineForm, MedicineDetail,
                      MedicineRow, TagInput, BarcodeScanner, Badges, Toast, States, Icon, Mascote
   lib/               config.ts (API_BASE, APP_BASE, asset), session.ts (token), api.ts (fetch),
-                     queries.ts (TanStack Query), push.ts (inscrição), notifications.ts
-                     (lógica do SW, testável), catalog.ts (busca no catálogo), scanner.ts
+                     queries.ts (TanStack Query), push.ts (inscrição), device.ts (avisos deste
+                     aparelho), motion.ts (troca de tela, vibração), notifications.ts (lógica
+                     do SW, testável), catalog.ts (busca no catálogo), scanner.ts
                      (leitor de código, baixado só ao abrir a câmera), install.ts, dates.ts
-  styles/            tokens.css (cores, tipos, espaços), base.css, app.css
+  styles/            tokens.css (cores, tipos, espaços, movimento), base.css, app.css,
+                     motion.css (animações e acabamento)
 
 art/mascote/         Artes originais do Boldinho (PNG 1024, geradas por IA). Fonte dos ícones.
 public/              icons/ e mascote/ são GERADOS por `npm run icons`, e catalogo/ por
@@ -167,6 +169,31 @@ lateral usa `--nav-*`, que fica escura nos dois temas. O E2E mede o contraste no
 - O painel de remédio (`Sheet`) é um `<dialog>` modal: sobe de baixo no celular, entra pela
   direita em telas largas. O `Toast` usa `popover` para ficar acima dele.
 - Alvos de toque de pelo menos 44px, foco visível, `prefers-reduced-motion` respeitado.
+
+### Movimento
+
+Fica em `src/styles/motion.css` (carregado depois de `app.css`), com as durações e curvas em
+`tokens.css` (`--rapido`, `--medio`, `--lento`, `--sai`, `--mola`). As regras:
+
+- O que responde a um toque dura menos de 300 ms e desacelera no fim (`--sai`). `--mola`
+  (passa do ponto e volta) só onde há o que confirmar ou comemorar: dose tomada, interruptor,
+  anel do dia completo.
+- Só `translate`/`scale`/`opacity` se mexem. Nada nasce de `scale(0)`.
+- **Troca de aba**: View Transitions (`withViewTransition` em `src/lib/motion.ts`, ligado no
+  `aroundNav` do roteador em `main.tsx`). A navegação fica parada e a tarja desliza até o
+  item novo. Abrir e fechar um remédio não passa por aí: é o `Sheet` que anima.
+- **Painel**: entra por CSS e sai por WAAPI (`dismiss()`), e só depois troca a rota. Quem
+  fecha o painel chama `close()` de `pages/Medicines.tsx`, não `navigate()` direto. No
+  celular dá para arrastar pelo cabeçalho; soltar depois de 120px (ou com um puxão rápido)
+  fecha.
+- **Hoje**: registrar dose é otimista (`useDoseAction` muda o cache na hora), o anel
+  (`dayProgress` em `shared/schedule.ts`) acompanha, e as folhas só voam quando a última
+  dose do dia é registrada com a tela aberta.
+- Animação contínua (Boldinho flutuando, esqueleto) nunca termina: nos testes, quem espera
+  "as animações acabarem" precisa filtrar por `iterations !== Infinity` e pelo relógio do
+  documento (veja `tests/e2e/responsive.spec.ts`).
+- Com "reduzir movimento" ligado no sistema, `base.css` zera durações e repetições, as View
+  Transitions não rodam e o painel fecha na hora.
 
 Depois de mudar a aparência, rode `node scripts/screenshots.mjs` contra um servidor com
 `scripts/seed.mjs` aplicado e olhe as imagens em `docs/screenshots/`.

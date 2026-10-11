@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useLocation, useRoute } from 'wouter';
 import type { MedicineHealth } from '../../shared/status';
 import { tagKey } from '../../shared/tags';
@@ -7,7 +7,7 @@ import { Icon } from '../components/Icon';
 import { MedicineDetail } from '../components/MedicineDetail';
 import { MedicineForm } from '../components/MedicineForm';
 import { MedicineRow } from '../components/MedicineRow';
-import { Sheet } from '../components/Sheet';
+import { Sheet, type SheetHandle } from '../components/Sheet';
 import { Empty, LoadError, Loading } from '../components/States';
 import { useHealth, useMedicines } from '../lib/queries';
 
@@ -34,6 +34,7 @@ export function Medicines() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('todos');
   const [tag, setTag] = useState<string | null>(null);
+  const sheet = useRef<SheetHandle>(null);
 
   const [isNew] = useRoute('/remedios/novo');
   const [isEdit, editParams] = useRoute('/remedios/:id/editar');
@@ -69,7 +70,9 @@ export function Medicines() {
         )),
   );
   const open = all.find(({ medicine }) => medicine.id === openId);
-  const close = () => navigate('/remedios');
+  const leave = () => navigate('/remedios');
+  /** Fecha o painel com a animação de saída; `leave` troca a rota quando ela termina. */
+  const close = () => (sheet.current ? sheet.current.dismiss() : leave());
 
   return (
     <>
@@ -159,32 +162,30 @@ export function Medicines() {
             </p>
           ) : (
             <ul className="lista">
-              {shown.map(({ medicine, health }) => (
-                <MedicineRow key={medicine.id} medicine={medicine} health={health} />
+              {shown.map(({ medicine, health }, index) => (
+                <MedicineRow key={medicine.id} medicine={medicine} health={health} index={index} />
               ))}
             </ul>
           )}
         </>
       )}
 
-      {isNew && (
-        <Sheet title="Novo remédio" onClose={close}>
-          <MedicineForm
-            medicine={null}
-            usedTags={usedTags}
-            onSaved={(saved) => navigate(`/remedios/${saved.id}`, { replace: true })}
-            onCancel={close}
-          />
-        </Sheet>
-      )}
-
-      {!isNew && (isDetail || isEdit) && (
+      {(isNew || isDetail || isEdit) && (
         <Sheet
-          title={open ? open.medicine.name : 'Remédio não encontrado'}
-          onClose={close}
+          ref={sheet}
+          title={isNew ? 'Novo remédio' : open ? open.medicine.name : 'Remédio não encontrado'}
+          view={isNew ? 'novo' : isEdit ? 'editar' : 'detalhe'}
+          onClose={leave}
           onBack={isEdit && open ? () => navigate(`/remedios/${open.medicine.id}`) : undefined}
         >
-          {!open ? (
+          {isNew ? (
+            <MedicineForm
+              medicine={null}
+              usedTags={usedTags}
+              onSaved={(saved) => navigate(`/remedios/${saved.id}`, { replace: true })}
+              onCancel={close}
+            />
+          ) : !open ? (
             <p className="secao-vazia">Ele pode ter sido excluído em outro aparelho.</p>
           ) : isEdit ? (
             <MedicineForm
@@ -195,7 +196,7 @@ export function Medicines() {
               onCancel={() => navigate(`/remedios/${open.medicine.id}`)}
             />
           ) : (
-            <MedicineDetail medicine={open.medicine} health={open.health} />
+            <MedicineDetail medicine={open.medicine} health={open.health} onDeleted={close} />
           )}
         </Sheet>
       )}

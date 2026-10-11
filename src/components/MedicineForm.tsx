@@ -451,6 +451,7 @@ export function MedicineForm({ medicine, usedTags = [], onSaved, onCancel }: Med
           <label className="avisado avisado-so">
             <input
               type="checkbox"
+              role="switch"
               checked={notify}
               onChange={(e) => setNotifyChoice(e.target.checked)}
             />

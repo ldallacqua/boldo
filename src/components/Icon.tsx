@@ -58,6 +58,13 @@ const PATHS = {
       <path d="M8 8.5v7M11 8.5v7M13.5 8.5v7M16 8.5v7" />
     </>
   ),
+  alert: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.8v4.8M12 16.1v.1" />
+    </>
+  ),
+  chevron: <path d="m9.5 6 6 6-6 6" />,
   phone: (
     <>
       <rect x="7" y="3" width="10" height="18" rx="2.5" />

@@ -64,3 +64,12 @@ export function attentionReasons(
   }
   return reasons;
 }
+
+/** Quanto falta, em palavras: "agora", "em 35 min", "em 2 h", "em 2 h 10 min". */
+export function formatWait(minutes: number): string {
+  if (minutes <= 0) return 'agora';
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `em ${rest} min`;
+  return rest === 0 ? `em ${hours} h` : `em ${hours} h ${rest} min`;
+}

@@ -23,7 +23,7 @@ export function App() {
     return () => navigator.serviceWorker.removeEventListener('message', onMessage);
   }, [client]);
 
-  if (session.isPending) return <Loading label="Abrindo o Boldo" />;
+  if (session.isPending) return <Loading label="Abrindo o Boldo" variant="marca" />;
   if (session.isError) {
     return <LoadError message={session.error.message} onRetry={() => session.refetch()} />;
   }

@@ -51,6 +51,7 @@ function DeviceMedicines() {
           <label key={medicine.id} className="avisado">
             <input
               type="checkbox"
+              role="switch"
               checked={notifies(medicine.id)}
               onChange={(e) => toggle(medicine.id, e.target.checked)}
             />
@@ -72,7 +73,7 @@ function DeviceMedicines() {
 function Appearance() {
   const [choice, setChoice] = useState<ThemeChoice>(getThemeChoice);
   const options: [ThemeChoice, string][] = [
-    ['auto', 'Como o aparelho'],
+    ['auto', 'Automático'],
     ['claro', 'Claro'],
     ['escuro', 'Escuro'],
   ];
@@ -97,7 +98,9 @@ function Appearance() {
           </label>
         ))}
       </fieldset>
-      <p className="ajuda">Vale só para este aparelho.</p>
+      <p className="ajuda">
+        Automático acompanha o tema do aparelho. A escolha vale só para este aparelho.
+      </p>
     </section>
   );
 }
