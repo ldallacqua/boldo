@@ -102,13 +102,43 @@ test('cada aparelho escolhe de quais remédios quer ser avisado', async ({ page 
   await page.goto('/ajustes');
   const list = page.getByRole('group', { name: 'Avisar neste aparelho sobre' });
   await expect(list.getByLabel(mine.name)).toBeChecked();
-  await list.getByLabel(hers.name).uncheck();
+  await list.getByLabel(hers.name).click();
+  await expect(list.getByLabel(hers.name)).not.toBeChecked();
   await expect.poll(muted).toEqual([hers.id]);
 
   await page.reload();
   await expect(list.getByLabel(hers.name)).not.toBeChecked();
   await expect(list.getByLabel(mine.name)).toBeChecked();
 
-  await list.getByLabel(hers.name).check();
+  await list.getByLabel(hers.name).click();
+  await expect(list.getByLabel(hers.name)).toBeChecked();
   await expect.poll(muted).toEqual([]);
+
+  // A mesma escolha aparece na tela do remédio e no formulário.
+  await page.goto(`/remedios/${hers.id}`);
+  const here = page.getByLabel('Avisar neste aparelho');
+  await expect(here).toBeChecked();
+  await here.click();
+  await expect(here).not.toBeChecked();
+  await expect.poll(muted).toEqual([hers.id]);
+
+  await page.goto(`/remedios/${hers.id}/editar`);
+  await expect(here).not.toBeChecked();
+  await here.click();
+  await expect(here).toBeChecked();
+  await page.getByRole('button', { name: 'Salvar remédio' }).click();
+  await expect.poll(muted).toEqual([]);
+
+  await page.goto('/remedios/novo');
+  const name = unique(info, 'Do enteado');
+  await page.getByLabel('Nome').fill(name);
+  await expect(here).toBeChecked();
+  await here.click();
+  await expect(here).not.toBeChecked();
+  await page.getByRole('button', { name: 'Salvar remédio' }).click();
+  await expect(page.getByText('Remédio salvo')).toBeVisible();
+  const created = ((await client.get('/api/medicines')) as { id: number; name: string }[]).find(
+    (medicine) => medicine.id && medicine.name === name,
+  )!;
+  await expect.poll(muted).toEqual([created.id]);
 });

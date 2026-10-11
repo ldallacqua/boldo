@@ -10,6 +10,7 @@ import {
 } from '../../shared/format';
 import type { MedicineHealth } from '../../shared/status';
 import type { Medicine } from '../../shared/types';
+import { useDeviceAlerts } from '../lib/device';
 import { useAdjustQuantity, useDeleteMedicine } from '../lib/queries';
 import { Badges } from './Badges';
 import { Icon } from './Icon';
@@ -36,6 +37,7 @@ export function MedicineDetail({
   const adjust = useAdjustQuantity(medicine.id);
   const remove = useDeleteMedicine();
   const toast = useToast();
+  const alerts = useDeviceAlerts();
 
   const change = (delta: number) =>
     adjust.mutate(delta, { onError: (error) => toast(error.message, 'error') });
@@ -132,6 +134,28 @@ export function MedicineDetail({
           <dd className="ficha-notas">{medicine.notes || 'Nenhuma anotação'}</dd>
         </div>
       </dl>
+
+      {alerts.device ? (
+        <label className="avisado avisado-so">
+          <input
+            type="checkbox"
+            checked={alerts.notifies(medicine.id)}
+            onChange={(e) =>
+              alerts
+                .setNotify(medicine.id, e.target.checked)
+                .catch((error: Error) => toast(error.message, 'error'))
+            }
+          />
+          <span className="avisado-nome">Avisar neste aparelho</span>
+        </label>
+      ) : (
+        alerts.ready && (
+          <p className="ajuda">
+            Este aparelho não recebe lembretes. Para receber, ative em{' '}
+            <Link href="/ajustes">Ajustes</Link>.
+          </p>
+        )
+      )}
 
       {confirming ? (
         <div className="confirmar" role="alertdialog" aria-labelledby="confirmar-titulo">

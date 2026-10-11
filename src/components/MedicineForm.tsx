@@ -14,6 +14,7 @@ import {
 import { parseMedicineInput } from '../../shared/validate';
 import { TagInput } from './TagInput';
 import { MONTHS } from '../lib/dates';
+import { useDeviceAlerts } from '../lib/device';
 import { useSaveMedicine } from '../lib/queries';
 import { BarcodeScanner } from './BarcodeScanner';
 import { Icon } from './Icon';
@@ -115,6 +116,10 @@ export function MedicineForm({ medicine, usedTags = [], onSaved, onCancel }: Med
   const [scanned, setScanned] = useState<CatalogMatch | null>(null);
   const save = useSaveMedicine(medicine?.id ?? null);
   const toast = useToast();
+  const alerts = useDeviceAlerts();
+  // null: a pessoa não mexeu, vale o que o aparelho já tem (remédio novo começa avisando).
+  const [notifyChoice, setNotifyChoice] = useState<boolean | null>(null);
+  const notify = notifyChoice ?? (medicine ? alerts.notifies(medicine.id) : true);
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((current) => ({ ...current, [key]: value }));
@@ -166,7 +171,12 @@ export function MedicineForm({ medicine, usedTags = [], onSaved, onCancel }: Med
     }
     setError(null);
     save.mutate(parsed.value, {
-      onSuccess: (saved) => {
+      onSuccess: async (saved) => {
+        if (alerts.device && notify !== alerts.notifies(saved.id)) {
+          await alerts
+            .setNotify(saved.id, notify)
+            .catch(() => toast('Não deu para guardar a escolha de aviso deste aparelho', 'error'));
+        }
         toast('Remédio salvo');
         onSaved(saved);
       },
@@ -435,6 +445,23 @@ export function MedicineForm({ medicine, usedTags = [], onSaved, onCancel }: Med
           placeholder="Onde está guardado, quem receitou, tomar depois de comer…"
         />
       </div>
+
+      {alerts.device && (
+        <div className="campo">
+          <label className="avisado avisado-so">
+            <input
+              type="checkbox"
+              checked={notify}
+              onChange={(e) => setNotifyChoice(e.target.checked)}
+            />
+            <span className="avisado-nome">Avisar neste aparelho</span>
+          </label>
+          <p className="ajuda">
+            Lembrete de dose e aviso de estoque e validade deste remédio. Cada aparelho da casa
+            escolhe o seu.
+          </p>
+        </div>
+      )}
 
       {error && (
         <p className="erro" role="alert">

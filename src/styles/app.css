@@ -1671,6 +1671,11 @@ fieldset.campo {
   cursor: pointer;
 }
 
+/* Sozinho, na tela ou no formulário de um remédio. */
+.avisado-so {
+  border-block: 1px solid var(--linha);
+}
+
 .avisado input {
   flex: none;
   width: 22px;

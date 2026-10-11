@@ -67,7 +67,8 @@ test('os alvos de toque principais têm pelo menos 44px', async ({ page }, info)
   ];
   for (const target of targets) {
     const box = (await target.boundingBox())!;
-    expect(Math.min(box.width, box.height)).toBeGreaterThanOrEqual(44);
+    // O WebKit devolve 43,99999 quando o botão cai em posição fracionária.
+    expect(Math.round(Math.min(box.width, box.height) * 100) / 100).toBeGreaterThanOrEqual(44);
   }
 });
 

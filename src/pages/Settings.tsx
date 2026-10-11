@@ -5,11 +5,11 @@ import { Mascote } from '../components/Mascote';
 import { LoadError, Loading } from '../components/States';
 import { useToast } from '../components/Toast';
 import { api } from '../lib/api';
+import { useDeviceAlerts } from '../lib/device';
 import { promptInstall, useCanInstall } from '../lib/install';
 import {
   disablePush,
   enablePush,
-  getPushEndpoint,
   getPushState,
   isIos,
   isStandalone,
@@ -36,38 +36,12 @@ const PUSH_TEXT: Record<PushState, string> = {
 function DeviceMedicines() {
   const medicines = useMedicines();
   const toast = useToast();
-  const [endpoint, setEndpoint] = useState<string | null>(null);
-  const [muted, setMuted] = useState<number[] | null>(null);
+  const { device, notifies, setNotify } = useDeviceAlerts();
 
-  useEffect(() => {
-    let current = true;
-    (async () => {
-      const found = await getPushEndpoint();
-      if (!found) return;
-      const device = await api.getDevice(found);
-      if (!current) return;
-      setEndpoint(found);
-      setMuted(device.mutedMedicines);
-    })().catch(() => undefined);
-    return () => {
-      current = false;
-    };
-  }, []);
+  if (!device || !medicines.data || medicines.data.length === 0) return null;
 
-  if (!endpoint || !muted || !medicines.data) return null;
-  if (medicines.data.length === 0) return null;
-
-  const toggle = async (id: number, notify: boolean) => {
-    const before = muted;
-    const next = notify ? muted.filter((other) => other !== id) : [...muted, id];
-    setMuted(next);
-    try {
-      setMuted((await api.saveDevice(endpoint, next)).mutedMedicines);
-    } catch (error) {
-      setMuted(before);
-      toast((error as Error).message, 'error');
-    }
-  };
+  const toggle = (id: number, notify: boolean) =>
+    setNotify(id, notify).catch((error: Error) => toast(error.message, 'error'));
 
   return (
     <fieldset className="campo">
@@ -77,7 +51,7 @@ function DeviceMedicines() {
           <label key={medicine.id} className="avisado">
             <input
               type="checkbox"
-              checked={!muted.includes(medicine.id)}
+              checked={notifies(medicine.id)}
               onChange={(e) => toggle(medicine.id, e.target.checked)}
             />
             <span className="avisado-nome">
@@ -89,7 +63,7 @@ function DeviceMedicines() {
       </div>
       <p className="ajuda">
         Desmarque os remédios de outra pessoa da casa. Vale só para este aparelho; os outros
-        continuam recebendo. Remédios novos já entram marcados.
+        continuam recebendo. Também dá para mudar isso na tela de cada remédio.
       </p>
     </fieldset>
   );
