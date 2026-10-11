@@ -31,6 +31,10 @@ export default defineConfig({
     { name: 'desktop', testIgnore: PAGES_SPEC, use: { ...devices['Desktop Chrome'] } },
     { name: 'celular', testIgnore: PAGES_SPEC, use: { ...devices['Pixel 7'] } },
     { name: 'tablet', testIgnore: PAGES_SPEC, use: { ...devices['Galaxy Tab S9'] } },
+    // WebKit, o motor do Safari: é nele que o app roda em qualquer iPhone ou iPad.
+    { name: 'iphone', testIgnore: PAGES_SPEC, use: { ...devices['iPhone 17 Pro Max'] } },
+    { name: 'ipad', testIgnore: PAGES_SPEC, use: { ...devices['iPad Pro 11'] } },
+    { name: 'safari', testIgnore: PAGES_SPEC, use: { ...devices['Desktop Safari'] } },
     {
       name: 'pages',
       testMatch: PAGES_SPEC,

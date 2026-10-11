@@ -16,7 +16,7 @@ do Brasil; identificadores de código são em inglês; classes CSS são em portu
 | `npm run icons`              | Depois de mudar as artes em `art/mascote/`: regenera ícones e imagens das telas.                    |
 | `npm run deploy:api`         | Publicar a API no Supabase (acrescente `-- --project-ref <ref>`). Veja `docs/hospedagem.md`.        |
 
-Requer Node 24. E2E precisa de `npx playwright install chromium` uma vez.
+Requer Node 24. E2E precisa de `npx playwright install chromium webkit` uma vez.
 
 ## Mapa do código
 
@@ -155,6 +155,12 @@ Depois de mudar a aparência, rode `node scripts/screenshots.mjs` contra um serv
 - **Service worker só no build**: em `npm run dev` não há SW, logo não há push nem offline.
 - **Chromium sem janela nega notificações**: por isso o E2E de push troca `showNotification`
   por um espião, e a entrega real precisa ser conferida em um aparelho ("Enviar um teste").
+- **WebKit do Playwright não é o Safari do iPhone**: os projetos `iphone`, `ipad` e `safari`
+  do E2E usam o motor do Safari, mas os campos de formulário do iOS (hora, data, seletores)
+  só existem no iOS. O campo de hora invadindo o vizinho passava no WebKit e quebrava no
+  aparelho. Para mexer em formulário, confira no simulador do Xcode:
+  `xcrun simctl boot "iPhone 17 Pro Max"`, `xcrun simctl openurl booted http://localhost:3210/`
+  e `xcrun simctl io booted screenshot tela.png`.
 - **iOS**: push só com o app instalado na Tela de Início (16.4+). `getPushState()` devolve
   `needs-install` nesse caso.
 - **Callbacks de `mutate()` não rodam se o componente desmontar** antes de a mutação

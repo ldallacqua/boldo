@@ -70,3 +70,58 @@ test('os alvos de toque principais têm pelo menos 44px', async ({ page }, info)
     expect(Math.min(box.width, box.height)).toBeGreaterThanOrEqual(44);
   }
 });
+
+test('no formulário, nenhum campo invade o vizinho', async ({ page }, info) => {
+  const medicine = await createMedicine(page, {
+    name: unique(info, 'Campos'),
+    dosage: '1.200.000 UI/mL',
+    unit: 'aplicacao',
+    quantity: 1234.5,
+    lowThreshold: 2000,
+    expiresOn: '2030-12',
+    schedules: [
+      { time: '08:00', days: [0, 1, 2, 3, 4, 5, 6], dose: 1 },
+      { time: '23:59', days: [1, 3, 5], dose: 12.5 },
+    ],
+  });
+  await page.goto(`/remedios/${medicine.id}/editar`);
+  await expect(page.getByLabel('Horário 2', { exact: true })).toBeVisible();
+
+  const findProblems = () =>
+    page.evaluate(async () => {
+      // O painel entra deslizando; medir no meio do caminho dá posições que não valem.
+      await Promise.all(document.getAnimations().map((animation) => animation.finished));
+      const form = document.querySelector('form.formulario')!;
+      const bounds = form.getBoundingClientRect();
+      const label = (el: Element) =>
+        el.getAttribute('aria-label') || el.id || el.textContent?.trim().slice(0, 20) || el.tagName;
+      const parts = [
+        ...form.querySelectorAll('input, select, textarea, button, .campo-sufixo span'),
+      ]
+        // A barra de Salvar fica grudada no rodapé e passa por cima de propósito.
+        .filter((el) => !el.closest('.acoes-fixas'))
+        .map((el) => ({ name: label(el), tag: el.tagName, box: el.getBoundingClientRect() }));
+
+      const found: string[] = [];
+      for (const [index, a] of parts.entries()) {
+        if (a.box.left < bounds.left - 0.5 || a.box.right > bounds.right + 0.5) {
+          found.push(`"${a.name}" sai do formulário`);
+        }
+        if (a.tag !== 'SPAN' && a.box.width < 40) {
+          found.push(`"${a.name}" ficou com ${Math.round(a.box.width)}px de largura`);
+        }
+        for (const b of parts.slice(index + 1)) {
+          const x = Math.min(a.box.right, b.box.right) - Math.max(a.box.left, b.box.left);
+          const y = Math.min(a.box.bottom, b.box.bottom) - Math.max(a.box.top, b.box.top);
+          if (x > 0.5 && y > 0.5) found.push(`"${a.name}" invade "${b.name}"`);
+        }
+      }
+      return found;
+    });
+
+  expect(await findProblems(), 'no tamanho do aparelho').toEqual([]);
+
+  // O celular mais estreito ainda em uso (iPhone SE de 1ª geração, Androids pequenos).
+  await page.setViewportSize({ width: 320, height: 640 });
+  expect(await findProblems(), 'com 320px de largura').toEqual([]);
+});

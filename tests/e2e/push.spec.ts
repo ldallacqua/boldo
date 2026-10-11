@@ -6,7 +6,13 @@ import { expect, test } from '@playwright/test';
  * por um espião. O envio servidor → serviço de push do navegador não é coberto aqui: depende
  * da internet e de um aparelho real (use "Enviar um teste" em Ajustes).
  */
-test('o service worker transforma o push em notificação', async ({ browser, baseURL }) => {
+test('o service worker transforma o push em notificação', async ({
+  browser,
+  baseURL,
+  browserName,
+}) => {
+  // O Playwright só dá acesso ao service worker (para simular o push) no Chromium.
+  test.skip(browserName !== 'chromium', 'Playwright só expõe service workers no Chromium');
   const context = await browser.newContext({ serviceWorkers: 'allow' });
   const page = await context.newPage();
   await page.goto('./');

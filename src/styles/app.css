@@ -1019,6 +1019,17 @@ fieldset.campo {
   background-size: 20px;
 }
 
+/* No Safari do iOS o campo de hora tem largura própria: ignora a da coluna, invade o campo
+   vizinho e centraliza o texto. Sem a aparência nativa ele obedece ao layout; o seletor de
+   hora do sistema continua abrindo. */
+.campo input[type='time'] {
+  appearance: none;
+}
+
+.campo input[type='time']::-webkit-date-and-time-value {
+  text-align: left;
+}
+
 .campo input:focus-visible,
 .campo select:focus-visible,
 .campo textarea:focus-visible {
@@ -1076,6 +1087,7 @@ fieldset.campo {
 }
 
 .horario {
+  container-type: inline-size;
   display: grid;
   gap: var(--e-3);
   padding: var(--e-3);
@@ -1091,17 +1103,38 @@ fieldset.campo {
   gap: var(--e-2);
 }
 
+/* Em telas estreitas, hora, dose, unidade e lixeira não cabem em uma linha só (a dose sumia
+   e "comprimidos" passava por cima da lixeira): a dose desce para a linha de baixo. */
+@container (max-width: 330px) {
+  .horario-linha {
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+
+  .horario-linha .campo-sufixo {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+}
+
+/* Círculos de 44px, que encolhem juntos quando a linha não comporta os sete. */
 .dias {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 44px));
   gap: 6px;
 }
 
+/* Abaixo disso os círculos ficariam pequenos demais para o dedo: viram duas linhas. */
+@container (max-width: 300px) {
+  .dias {
+    grid-template-columns: repeat(4, 44px);
+  }
+}
+
 .dia {
-  height: 40px;
+  aspect-ratio: 1;
   padding: 0;
   border: 1.5px solid var(--linha-forte);
-  border-radius: var(--capsula);
+  border-radius: 50%;
   background: transparent;
   color: var(--tinta-suave);
   font-weight: 600;

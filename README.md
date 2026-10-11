@@ -131,17 +131,17 @@ Para ter dados de exemplo: `ADMIN_PASSWORD=<sua senha> node scripts/seed.mjs`.
 O service worker (instalação, offline e notificações) só existe no build de produção:
 use `npm run build && npm start` para testar essas partes.
 
-| Comando            | O que faz                                                          |
-| ------------------ | ------------------------------------------------------------------ |
-| `npm run dev`      | Servidor e front-end com recarga automática.                       |
-| `npm run build`    | Gera `dist/` (app) e `dist-server/` (servidor).                    |
-| `npm start`        | Roda o build de produção.                                          |
-| `npm test`         | Testes unitários (Vitest).                                         |
-| `npm run test:e2e` | Testes de ponta a ponta (Playwright) em desktop, celular e tablet. |
-| `npm run check`    | Tipos, lint, formatação e testes unitários.                        |
-| `npm run icons`    | Regenera os ícones do PWA.                                         |
+| Comando            | O que faz                                                              |
+| ------------------ | ---------------------------------------------------------------------- |
+| `npm run dev`      | Servidor e front-end com recarga automática.                           |
+| `npm run build`    | Gera `dist/` (app) e `dist-server/` (servidor).                        |
+| `npm start`        | Roda o build de produção.                                              |
+| `npm test`         | Testes unitários (Vitest).                                             |
+| `npm run test:e2e` | Testes de ponta a ponta (Playwright) no Chromium e no WebKit (Safari). |
+| `npm run check`    | Tipos, lint, formatação e testes unitários.                            |
+| `npm run icons`    | Regenera os ícones do PWA.                                             |
 
-Na primeira vez, instale o navegador dos testes E2E: `npx playwright install chromium`.
+Na primeira vez, instale os navegadores dos testes E2E: `npx playwright install chromium webkit`.
 
 ## Testes
 
@@ -149,7 +149,8 @@ Na primeira vez, instale o navegador dos testes E2E: `npx playwright install chr
   banco de dados (em um Postgres embutido de verdade), API (sessão por token, limite de
   tentativas, CORS, cadastro, doses, cron), agendador de lembretes, criptografia do Web Push
   (conferida contra a biblioteca de referência `web-push`) e a lógica das notificações.
-- **E2E** (`tests/e2e`): o app de produção em três tamanhos de tela, mais um cenário que
+- **E2E** (`tests/e2e`): o app de produção em três tamanhos de tela, no Chromium e no WebKit
+  (o motor do Safari do iPhone, do iPad e do Mac), mais um cenário que
   imita a hospedagem gratuita (app em subpasta de um site estático, API em outra origem).
   Cobre entrar e sair, cadastro completo, ajuste de estoque, edição com horários, exclusão,
   busca e filtros, doses do dia, manifesto e ícones do PWA, uso offline e a montagem da
