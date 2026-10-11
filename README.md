@@ -18,8 +18,12 @@ Supabase; veja [docs/hospedagem.md](docs/hospedagem.md)).
 
 ## O que ele faz
 
-- **Remédios**: nome, dosagem (número e medida: mg, g, mcg, mL, UI, %…), para que serve,
-  quantidade, unidade (comprimidos, cápsulas, mL, gotas…), validade e anotações livres.
+- **Remédios**: nome, dosagem (número e medida: mg, g, mcg, mL, UI, %…), para que serve
+  (em tags: Dor, Febre, Alergia…, com filtro por tag na lista), quantidade, unidade
+  (comprimidos, cápsulas, mL, gotas…), validade e anotações livres.
+- **Código de barras**: ao cadastrar, aponte a câmera para o código da caixa (ou mande uma
+  foto, ou digite os números) e o Boldo preenche nome, dosagem, unidade, quantidade da caixa e
+  tags a partir da lista aberta de medicamentos da Anvisa. Você confere e salva.
 - **Estoque**: botões de mais e menos para ajustar na hora. Quando há horários cadastrados,
   mostra para quantos dias o estoque dá.
 - **Hoje**: as doses do dia em ordem de horário. "Tomei" registra a dose e já desconta do
@@ -140,6 +144,7 @@ use `npm run build && npm start` para testar essas partes.
 | `npm run test:e2e` | Testes de ponta a ponta (Playwright) no Chromium e no WebKit (Safari). |
 | `npm run check`    | Tipos, lint, formatação e testes unitários.                            |
 | `npm run icons`    | Regenera os ícones do PWA.                                             |
+| `npm run catalog`  | Baixa a lista da Anvisa e regenera o catálogo do código de barras.     |
 
 Na primeira vez, instale os navegadores dos testes E2E: `npx playwright install chromium webkit`.
 

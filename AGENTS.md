@@ -14,6 +14,7 @@ do Brasil; identificadores de código são em inglês; classes CSS são em portu
 | `npm run build && npm start` | Testar o que só existe em produção: service worker, instalação, offline, push.                      |
 | `npm run format`             | Corrigir formatação (Prettier).                                                                     |
 | `npm run icons`              | Depois de mudar as artes em `art/mascote/`: regenera ícones e imagens das telas.                    |
+| `npm run catalog`            | Atualizar o catálogo do código de barras com a lista atual da Anvisa.                               |
 | `npm run deploy:api`         | Publicar a API no Supabase (acrescente `-- --project-ref <ref>`). Veja `docs/hospedagem.md`.        |
 
 Requer Node 24. E2E precisa de `npx playwright install chromium webkit` uma vez.
@@ -27,6 +28,8 @@ shared/              Regras puras, sem I/O. Importadas pelo servidor E pelo app.
   schedule.ts        Estado da dose (pending/late/taken/skipped), quando o lembrete vence
   time.ts            Data/hora em um fuso IANA, minutos, diferença de dias
   dosage.ts          Dosagem: medidas aceitas (mg, g, mL…), formatDosage / parseDosage
+  tags.ts            Tags de "pra que serve": sugestões, limpeza, comparação sem acento
+  catalog.ts         Código de barras: EAN, leitura da apresentação da Anvisa, classe → tags
   format.ts          Textos pt-BR: quantidades, validade, dias da semana, motivos de atenção
   validate.ts        parseMedicineInput / parseSettings (usados na API e no formulário)
 
@@ -52,14 +55,16 @@ src/
   sw.ts              Service worker: precache (Workbox), evento push, clique na notificação
   pages/             Today (Hoje), Medicines (Remédios), Settings (Ajustes), Login
   components/        Shell (navegação), Sheet (painel modal), MedicineForm, MedicineDetail,
-                     MedicineRow, Badges, Toast, States (carregando/erro/vazio), Icon, Mascote
+                     MedicineRow, TagInput, BarcodeScanner, Badges, Toast, States, Icon, Mascote
   lib/               config.ts (API_BASE, APP_BASE, asset), session.ts (token), api.ts (fetch),
                      queries.ts (TanStack Query), push.ts (inscrição), notifications.ts
-                     (lógica do SW, testável), install.ts, dates.ts
+                     (lógica do SW, testável), catalog.ts (busca no catálogo), scanner.ts
+                     (leitor de código, baixado só ao abrir a câmera), install.ts, dates.ts
   styles/            tokens.css (cores, tipos, espaços), base.css, app.css
 
 art/mascote/         Artes originais do Boldinho (PNG 1024, geradas por IA). Fonte dos ícones.
-public/              icons/ e mascote/ são GERADOS por `npm run icons`; não edite à mão.
+public/              icons/ e mascote/ são GERADOS por `npm run icons`, e catalogo/ por
+                     `npm run catalog`; não edite à mão.
 
 tests/unit/          Vitest, ambiente Node. helpers.ts tem testApp() e memoryStore().
 tests/e2e/           Playwright contra o build de produção. helpers.ts tem login() e createMedicine().
@@ -87,6 +92,14 @@ scripts/             generate-icons.mjs, build-edge.mjs, serve-pages.mjs (Pages 
 - **Validade** é `AAAA-MM` (como na caixa) e vale até o último dia do mês.
 - **Dosagem** é um texto, mas sempre no formato de `formatDosage` ("500 mg", "0,9%"): a API
   recusa o que `parseDosage` não entende, e o formulário edita número e medida separados.
+- **Pra que serve** são tags (`tags: string[]`, coluna `jsonb`), limpas por `normalizeTags`:
+  sem repetição, comparadas sem acento nem maiúsculas, com a grafia das sugestões quando
+  coincidem. As tags em uso viram sugestão no formulário e filtro na lista.
+- **Código de barras**: `public/catalogo/NN.json` (NN = dois últimos dígitos do código) traz
+  as linhas da lista aberta de preços da Anvisa, cruas. O app baixa só o arquivo do código
+  lido e `toCatalogMatch()` transforma a linha em campos do formulário, então mudar a leitura
+  (`parsePresentation`, `CLASS_TAGS`) não exige regenerar o catálogo. Nada disso passa pela
+  API. O que vem do catálogo só preenche o formulário: quem salva é a pessoa.
 - **Doses**: um `Schedule` é "horário + dias da semana + dose". Registrar uma dose cria uma
   linha em `intakes` (única por horário e dia) e desconta do estoque; `amount` guarda o
   que saiu de fato para o "desfazer" devolver o valor certo.
@@ -152,6 +165,13 @@ Depois de mudar a aparência, rode `node scripts/screenshots.mjs` contra um serv
 
 ## Armadilhas conhecidas
 
+- **Câmera nos testes**: nenhum navegador de teste tem câmera. Nos projetos comuns o leitor
+  cai no estado "a câmera não abriu" e os testes usam foto e números; o projeto `camera` do
+  E2E faz o Chromium ler `tests/e2e/fixtures/camera.mjpeg` no lugar dela. O simulador do
+  iOS também não tem câmera: a leitura ao vivo no iPhone só se confere no aparelho.
+- **Catálogo e leitor ficam fora do cache offline**: o precache do service worker só pega
+  js/css/html/imagens/fontes; `catalogo/*.json` e o `.wasm` do leitor (1 MB) são baixados na
+  hora, e só por quem abre o leitor.
 - **Service worker só no build**: em `npm run dev` não há SW, logo não há push nem offline.
 - **Chromium sem janela nega notificações**: por isso o E2E de push troca `showNotification`
   por um espião, e a entrega real precisa ser conferida em um aparelho ("Enviar um teste").

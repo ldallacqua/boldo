@@ -1,8 +1,14 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 
 const PORT = 4173;
 const PAGES_PORT = 4174;
 const PAGES_SPEC = /pages\.spec\.ts/;
+const CAMERA_SPEC = /camera\.spec\.ts/;
+/** Os testes de tela, em todos os aparelhos: tudo menos os cenários com projeto próprio. */
+const SCREEN_SPECS = { testIgnore: [PAGES_SPEC, CAMERA_SPEC] };
+/** Um vídeo de um código de barras, que o Chromium entrega no lugar da câmera. */
+const FAKE_CAMERA = fileURLToPath(new URL('tests/e2e/fixtures/camera.mjpeg', import.meta.url));
 
 /**
  * Os testes rodam contra o app de produção, com um banco novo a cada execução, em duas formas:
@@ -28,13 +34,29 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    { name: 'desktop', testIgnore: PAGES_SPEC, use: { ...devices['Desktop Chrome'] } },
-    { name: 'celular', testIgnore: PAGES_SPEC, use: { ...devices['Pixel 7'] } },
-    { name: 'tablet', testIgnore: PAGES_SPEC, use: { ...devices['Galaxy Tab S9'] } },
+    { name: 'desktop', ...SCREEN_SPECS, use: { ...devices['Desktop Chrome'] } },
+    { name: 'celular', ...SCREEN_SPECS, use: { ...devices['Pixel 7'] } },
+    { name: 'tablet', ...SCREEN_SPECS, use: { ...devices['Galaxy Tab S9'] } },
     // WebKit, o motor do Safari: é nele que o app roda em qualquer iPhone ou iPad.
-    { name: 'iphone', testIgnore: PAGES_SPEC, use: { ...devices['iPhone 17 Pro Max'] } },
-    { name: 'ipad', testIgnore: PAGES_SPEC, use: { ...devices['iPad Pro 11'] } },
-    { name: 'safari', testIgnore: PAGES_SPEC, use: { ...devices['Desktop Safari'] } },
+    { name: 'iphone', ...SCREEN_SPECS, use: { ...devices['iPhone 17 Pro Max'] } },
+    { name: 'ipad', ...SCREEN_SPECS, use: { ...devices['iPad Pro 11'] } },
+    { name: 'safari', ...SCREEN_SPECS, use: { ...devices['Desktop Safari'] } },
+    {
+      // A câmera de verdade não existe nos testes: o Chromium lê um vídeo no lugar dela.
+      name: 'camera',
+      testMatch: CAMERA_SPEC,
+      use: {
+        ...devices['Pixel 7'],
+        permissions: ['camera'],
+        launchOptions: {
+          args: [
+            '--use-fake-device-for-media-stream',
+            '--use-fake-ui-for-media-stream',
+            `--use-file-for-fake-video-capture=${FAKE_CAMERA}`,
+          ],
+        },
+      },
+    },
     {
       name: 'pages',
       testMatch: PAGES_SPEC,

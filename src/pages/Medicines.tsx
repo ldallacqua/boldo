@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useRoute } from 'wouter';
 import type { MedicineHealth } from '../../shared/status';
+import { tagKey } from '../../shared/tags';
 import type { Medicine } from '../../shared/types';
 import { Icon } from '../components/Icon';
 import { MedicineDetail } from '../components/MedicineDetail';
@@ -32,6 +33,7 @@ export function Medicines() {
   const [, navigate] = useLocation();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('todos');
+  const [tag, setTag] = useState<string | null>(null);
 
   const [isNew] = useRoute('/remedios/novo');
   const [isEdit, editParams] = useRoute('/remedios/:id/editar');
@@ -46,11 +48,25 @@ export function Medicines() {
   const all = medicines.data.map((medicine) => ({ medicine, health: healthOf(medicine) }));
   const query = normalize(search.trim());
   const active = FILTERS.find((f) => f.key === filter)!;
+  // As tags em uso, da mais comum para a menos comum.
+  const tagCounts = new Map<string, number>();
+  for (const { medicine } of all) {
+    for (const used of medicine.tags) tagCounts.set(used, (tagCounts.get(used) ?? 0) + 1);
+  }
+  const usedTags = [...tagCounts.keys()].sort(
+    (a, b) => tagCounts.get(b)! - tagCounts.get(a)! || a.localeCompare(b, 'pt-BR'),
+  );
+  // Se a tag escolhida deixou de existir (remédio editado ou excluído), o filtro some com ela.
+  const activeTag = tag !== null && tagCounts.has(tag) ? tag : null;
+
   const shown = all.filter(
     ({ medicine, health }) =>
       active.test(medicine, health) &&
+      (activeTag === null || medicine.tags.some((used) => tagKey(used) === tagKey(activeTag))) &&
       (!query ||
-        normalize(`${medicine.name} ${medicine.purpose} ${medicine.dosage}`).includes(query)),
+        normalize(`${medicine.name} ${medicine.tags.join(' ')} ${medicine.dosage}`).includes(
+          query,
+        )),
   );
   const open = all.find(({ medicine }) => medicine.id === openId);
   const close = () => navigate('/remedios');
@@ -107,6 +123,23 @@ export function Medicines() {
                 </button>
               ))}
             </div>
+            {usedTags.length > 0 && (
+              <div className="filtros filtros-tags" role="group" aria-label="Filtrar por tag">
+                {usedTags.map((used) => (
+                  <button
+                    key={used}
+                    type="button"
+                    className="filtro"
+                    data-variant="tag"
+                    aria-pressed={activeTag === used}
+                    onClick={() => setTag(activeTag === used ? null : used)}
+                  >
+                    {used}
+                    <span className="filtro-conta numeros">{tagCounts.get(used)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {shown.length === 0 ? (
@@ -118,6 +151,7 @@ export function Medicines() {
                 onClick={() => {
                   setSearch('');
                   setFilter('todos');
+                  setTag(null);
                 }}
               >
                 Mostrar todos
@@ -137,6 +171,7 @@ export function Medicines() {
         <Sheet title="Novo remédio" onClose={close}>
           <MedicineForm
             medicine={null}
+            usedTags={usedTags}
             onSaved={(saved) => navigate(`/remedios/${saved.id}`, { replace: true })}
             onCancel={close}
           />
@@ -155,6 +190,7 @@ export function Medicines() {
             <MedicineForm
               key={open.medicine.id}
               medicine={open.medicine}
+              usedTags={usedTags}
               onSaved={() => navigate(`/remedios/${open.medicine.id}`)}
               onCancel={() => navigate(`/remedios/${open.medicine.id}`)}
             />

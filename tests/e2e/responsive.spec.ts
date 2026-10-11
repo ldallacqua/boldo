@@ -26,7 +26,7 @@ test('nenhuma tela rola para os lados', async ({ page }, info) => {
   const medicine = await createMedicine(page, {
     name: unique(info, 'Nome bem comprido de remédio para testar a quebra de linha'),
     dosage: '1.000 mg/mL',
-    purpose: 'Uma descrição longa de para que serve, que não pode empurrar a tela para o lado',
+    tags: ['Tag comprida com trinta letras', 'Dor', 'Febre', 'Inflamação', 'Gripe e resfriado'],
     quantity: 1234.5,
     unit: 'aplicacao',
     lowThreshold: 2000,

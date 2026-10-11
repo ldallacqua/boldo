@@ -1,5 +1,6 @@
+import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
-import { PASSWORD } from './helpers';
+import { expectAlergaliv, PASSWORD } from './helpers';
 
 /**
  * A hospedagem gratuita de verdade: o app em uma subpasta de um site estático (GitHub Pages)
@@ -37,6 +38,28 @@ test('entra, cadastra e lê os dados pela API em outra origem', async ({ page },
 
   expect(calls.length).toBeGreaterThan(0);
   expect(new Set(calls)).toEqual(new Set([API]));
+});
+
+test('o leitor de código de barras acha o catálogo e o leitor dentro da subpasta', async ({
+  page,
+}) => {
+  const fetched: string[] = [];
+  page.on('response', (response) => {
+    if (/catalogo\/|\.wasm/.test(response.url())) {
+      fetched.push(`${response.status()} ${new URL(response.url()).pathname}`);
+    }
+  });
+
+  await page.goto('./remedios/novo');
+  const sheet = page.getByRole('dialog');
+  await sheet.getByRole('button', { name: 'Ler código de barras' }).click();
+  await sheet
+    .getByLabel('Tirar foto do código')
+    .setInputFiles(fileURLToPath(new URL('fixtures/caixa.png', import.meta.url)));
+  await expectAlergaliv(sheet);
+
+  expect(fetched).toContain('200 /boldo/catalogo/73.json');
+  expect(fetched.some((line) => /^200 \/boldo\/assets\/.+\.wasm$/.test(line))).toBe(true);
 });
 
 test('recarregar em um endereço interno continua no app (404.html do Pages)', async ({ page }) => {

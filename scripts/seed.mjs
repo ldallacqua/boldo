@@ -24,7 +24,7 @@ const medicines = [
   {
     name: 'Losartana',
     dosage: '50 mg',
-    purpose: 'Pressão alta',
+    tags: ['Pressão alta'],
     unit: 'comprimido',
     quantity: 28,
     lowThreshold: 10,
@@ -38,7 +38,7 @@ const medicines = [
   {
     name: 'Dipirona',
     dosage: '500 mg',
-    purpose: 'Dor e febre',
+    tags: ['Dor', 'Febre'],
     unit: 'comprimido',
     quantity: 4,
     lowThreshold: 6,
@@ -49,7 +49,7 @@ const medicines = [
   {
     name: 'Vitamina D',
     dosage: '2.000 UI',
-    purpose: 'Suplemento',
+    tags: ['Vitamina'],
     unit: 'capsula',
     quantity: 45,
     lowThreshold: 10,
@@ -60,7 +60,7 @@ const medicines = [
   {
     name: 'Omeprazol',
     dosage: '20 mg',
-    purpose: 'Azia e refluxo',
+    tags: ['Azia'],
     unit: 'capsula',
     quantity: 14,
     lowThreshold: 7,
@@ -71,7 +71,7 @@ const medicines = [
   {
     name: 'Loratadina',
     dosage: '10 mg',
-    purpose: 'Alergia e rinite',
+    tags: ['Alergia'],
     unit: 'comprimido',
     quantity: 12,
     lowThreshold: 0,
@@ -82,7 +82,7 @@ const medicines = [
   {
     name: 'Xarope de guaco',
     dosage: '',
-    purpose: 'Tosse',
+    tags: ['Tosse'],
     unit: 'ml',
     quantity: 120,
     lowThreshold: 30,
@@ -93,7 +93,7 @@ const medicines = [
   {
     name: 'Soro fisiológico',
     dosage: '0,9%',
-    purpose: 'Lavar o nariz',
+    tags: ['Gripe e resfriado'],
     unit: 'ampola',
     quantity: 0,
     lowThreshold: 3,
@@ -104,7 +104,7 @@ const medicines = [
   {
     name: 'Ibuprofeno',
     dosage: '400 mg',
-    purpose: 'Dor e inflamação',
+    tags: ['Dor', 'Inflamação'],
     unit: 'comprimido',
     quantity: 20,
     lowThreshold: 5,

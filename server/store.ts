@@ -6,6 +6,7 @@ import type {
   UnitKey,
   Weekday,
 } from '../shared/types';
+import { splitPurpose } from '../shared/tags';
 import type { Db } from './db';
 
 /**
@@ -18,7 +19,7 @@ CREATE TABLE IF NOT EXISTS boldo.medicines (
   id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   name text NOT NULL,
   dosage text NOT NULL DEFAULT '',
-  purpose text NOT NULL DEFAULT '',
+  tags jsonb NOT NULL DEFAULT '[]',
   unit text NOT NULL DEFAULT 'comprimido',
   quantity double precision NOT NULL DEFAULT 0,
   low_threshold double precision NOT NULL DEFAULT 0,
@@ -88,7 +89,8 @@ interface MedicineRow {
   id: number;
   name: string;
   dosage: string;
-  purpose: string;
+  /** jsonb: o driver pode entregar já como lista ou ainda como texto. */
+  tags: string[] | string;
   unit: string;
   quantity: number;
   low_threshold: number;
@@ -145,7 +147,7 @@ function toMedicine(row: MedicineRow, schedules: Schedule[]): Medicine {
     id: row.id,
     name: row.name,
     dosage: row.dosage,
-    purpose: row.purpose,
+    tags: typeof row.tags === 'string' ? (JSON.parse(row.tags) as string[]) : row.tags,
     unit: row.unit as UnitKey,
     quantity: row.quantity,
     lowThreshold: row.low_threshold,
@@ -167,14 +169,41 @@ export class Store {
       "SELECT to_regclass('boldo.login_failures')::text AS ready",
     );
     if (!found?.ready) await this.db.exec(SCHEMA);
+    await this.migrate();
   }
 
-  /** Apaga todos os dados. Só para testes. */
+  /** Atualiza bancos criados por versões anteriores. Cada passo confere se ainda é preciso. */
+  private async migrate(): Promise<void> {
+    const columns = await this.db.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns
+        WHERE table_schema = 'boldo' AND table_name = 'medicines'`,
+    );
+    // "Pra que serve" era um texto livre (`purpose`) e virou tags.
+    if (columns.some((column) => column.column_name === 'purpose')) {
+      await this.db.transaction(async (tx) => {
+        await tx.exec(
+          "ALTER TABLE boldo.medicines ADD COLUMN IF NOT EXISTS tags jsonb NOT NULL DEFAULT '[]'",
+        );
+        const rows = await tx.query<{ id: number; purpose: string }>(
+          "SELECT id, purpose FROM boldo.medicines WHERE purpose <> ''",
+        );
+        for (const row of rows) {
+          await tx.query('UPDATE boldo.medicines SET tags = $1::jsonb WHERE id = $2', [
+            JSON.stringify(splitPurpose(row.purpose)),
+            row.id,
+          ]);
+        }
+        await tx.exec('ALTER TABLE boldo.medicines DROP COLUMN purpose');
+      });
+    }
+  }
+
   /** Uma consulta mínima, para `GET /api/health` dizer se o banco responde. */
   async ping(): Promise<void> {
     await this.db.query('SELECT 1');
   }
 
+  /** Apaga todos os dados. Só para testes. */
   async reset(): Promise<void> {
     const tables = TABLES.map((table) => `boldo.${table}`).join(', ');
     await this.db.exec(`TRUNCATE ${tables} RESTART IDENTITY CASCADE`);
@@ -265,13 +294,13 @@ export class Store {
     return this.transaction(async (tx) => {
       const [{ id }] = await tx.db.query<{ id: number }>(
         `INSERT INTO boldo.medicines
-           (name, dosage, purpose, unit, quantity, low_threshold, expires_on, notes, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+           (name, dosage, tags, unit, quantity, low_threshold, expires_on, notes, created_at, updated_at)
+         VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $9)
          RETURNING id`,
         [
           input.name,
           input.dosage,
-          input.purpose,
+          JSON.stringify(input.tags),
           input.unit,
           input.quantity,
           input.lowThreshold,
@@ -289,14 +318,14 @@ export class Store {
     return this.transaction(async (tx) => {
       const updated = await tx.db.query(
         `UPDATE boldo.medicines
-            SET name = $1, dosage = $2, purpose = $3, unit = $4, quantity = $5, low_threshold = $6,
+            SET name = $1, dosage = $2, tags = $3::jsonb, unit = $4, quantity = $5, low_threshold = $6,
                 expires_on = $7, notes = $8, updated_at = $9
           WHERE id = $10
           RETURNING id`,
         [
           input.name,
           input.dosage,
-          input.purpose,
+          JSON.stringify(input.tags),
           input.unit,
           input.quantity,
           input.lowThreshold,

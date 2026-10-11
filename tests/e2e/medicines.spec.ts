@@ -17,7 +17,15 @@ test('cadastra um remédio completo e mostra na lista e nos detalhes', async ({ 
   await sheet.getByLabel('Nome', { exact: true }).fill(name);
   await sheet.getByLabel('Valor da dosagem').fill('0.5');
   await sheet.getByLabel('Medida da dosagem').selectOption('g');
-  await sheet.getByLabel('Pra que serve').fill('Dor e febre');
+  // Tags: uma sugestão com um toque, uma escrita com Enter e uma separada por vírgula.
+  const tagField = sheet.getByLabel('Pra que serve');
+  await sheet.getByRole('button', { name: 'Febre', exact: true }).click();
+  await tagField.fill('dor');
+  await tagField.press('Enter');
+  await tagField.fill('uso da vovó, sobra');
+  await expect(sheet.getByRole('button', { name: 'Remover Uso da vovó' })).toBeVisible();
+  await sheet.getByRole('button', { name: 'Remover Febre' }).click();
+  // "sobra" ficou digitado sem Enter: entra como tag ao salvar.
   await sheet.getByLabel('Quantidade em casa').fill('20');
   await sheet.getByLabel('Unidade', { exact: true }).selectOption('capsula');
   await sheet.getByLabel('Avisar quando restar').fill('5');
@@ -29,7 +37,9 @@ test('cadastra um remédio completo e mostra na lista e nos detalhes', async ({ 
   await expect(page.getByRole('status')).toHaveText('Remédio salvo');
   await expect(sheet.getByRole('heading', { name })).toBeVisible();
   await expect(sheet).toContainText('0,5 g');
-  await expect(sheet).toContainText('Dor e febre');
+  await expect(sheet.getByRole('list', { name: 'Pra que serve' }).getByRole('listitem')).toHaveText(
+    ['Dor', 'Uso da vovó', 'Sobra'],
+  );
   await expect(sheet.getByTestId('quantidade')).toHaveText('20');
   await expect(sheet).toContainText('cápsulas em casa');
   await expect(sheet).toContainText('Avisa quando restarem 5 cápsulas');
@@ -38,7 +48,7 @@ test('cadastra um remédio completo e mostra na lista e nos detalhes', async ({ 
 
   await sheet.getByRole('button', { name: 'Fechar' }).click();
   await expect(sheet).toHaveCount(0);
-  await expect(row(page, name)).toContainText('Dor e febre');
+  await expect(row(page, name)).toContainText('Dor, Uso da vovó, Sobra');
   await expect(row(page, name)).toContainText('20');
   await expect(row(page, name)).toContainText(`Validade 08/${year}`);
 });
@@ -139,10 +149,10 @@ test('exclui só depois de confirmar', async ({ page }, info) => {
   await expect(row(page, medicine.name)).toHaveCount(0);
 });
 
-test('busca por nome ou por para que serve, ignorando acentos', async ({ page }, info) => {
+test('busca por nome ou por tag, ignorando acentos', async ({ page }, info) => {
   const tag = unique(info, 'zzbusca').replace(/ /g, '');
-  const cough = await createMedicine(page, { name: `Xarope ${tag}`, purpose: 'Tosse' });
-  const allergy = await createMedicine(page, { name: `Antialérgico ${tag}`, purpose: 'Rinite' });
+  const cough = await createMedicine(page, { name: `Xarope ${tag}`, tags: ['Tosse'] });
+  const allergy = await createMedicine(page, { name: `Antialérgico ${tag}`, tags: ['Rinite'] });
 
   await page.goto('/remedios');
   const search = page.getByRole('searchbox', { name: 'Buscar remédio' });
@@ -155,10 +165,40 @@ test('busca por nome ou por para que serve, ignorando acentos', async ({ page },
   await expect(row(page, allergy.name)).toBeVisible();
   await expect(row(page, cough.name)).toHaveCount(0);
 
+  await search.fill(`rinite`);
+  await expect(row(page, allergy.name)).toBeVisible();
+  await expect(row(page, cough.name)).toHaveCount(0);
+
   await search.fill('nada-com-esse-nome');
   await expect(page.getByText('Nenhum remédio com esses critérios.')).toBeVisible();
   await page.getByRole('button', { name: 'Mostrar todos' }).click();
   await expect(row(page, cough.name)).toBeVisible();
+});
+
+test('filtra por tag e oferece as tags já usadas no formulário', async ({ page }, info) => {
+  const tag = unique(info, 'Tag').replace(/ /g, '');
+  const withTag = await createMedicine(page, { name: unique(info, 'Com tag'), tags: [tag] });
+  const without = await createMedicine(page, { name: unique(info, 'Sem tag') });
+
+  await page.goto('/remedios');
+  const tagFilter = page
+    .getByRole('group', { name: 'Filtrar por tag' })
+    .getByRole('button', { name: tag });
+  await expect(tagFilter).toContainText('1');
+  await tagFilter.click();
+  await expect(row(page, withTag.name)).toBeVisible();
+  await expect(row(page, without.name)).toHaveCount(0);
+
+  await tagFilter.click();
+  await expect(row(page, without.name)).toBeVisible();
+
+  // A tag criada em um remédio vira sugestão nos outros.
+  await page.goto(`/remedios/${without.id}/editar`);
+  const sheet = page.getByRole('dialog');
+  await sheet.getByLabel('Pra que serve').fill(tag.slice(0, 12));
+  await sheet.getByRole('button', { name: tag, exact: true }).click();
+  await sheet.getByRole('button', { name: 'Salvar remédio' }).click();
+  await expect(sheet.getByRole('list', { name: 'Pra que serve' })).toContainText(tag);
 });
 
 test('filtra os que estão acabando e os que estão vencendo', async ({ page }, info) => {

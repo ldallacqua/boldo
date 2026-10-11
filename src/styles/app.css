@@ -719,6 +719,20 @@
   color: var(--creme);
 }
 
+/* Os filtros por tag têm a cor das tags, para não se confundirem com os de estado. */
+.filtros-tags {
+  grid-column: 1 / -1;
+}
+
+.filtro[data-variant='tag'] {
+  border-color: transparent;
+  background: var(--salvia);
+}
+
+.filtro[data-variant='tag'][aria-pressed='true'] {
+  background: var(--boldo);
+}
+
 .filtro-conta {
   font-weight: 500;
   opacity: 0.75;
@@ -1039,6 +1053,184 @@ fieldset.campo {
 
 .campo input[aria-invalid='true'] {
   border-color: var(--vermelho);
+}
+
+/* ── Leitor de código de barras ────────────────────────────────────────── */
+
+.leitor-abrir {
+  justify-self: start;
+}
+
+.leitor {
+  display: grid;
+  gap: var(--e-3);
+  padding: var(--e-3);
+  border: 1px solid var(--linha);
+  border-radius: var(--canto-caixa);
+  background: var(--papel);
+}
+
+.leitor-camera {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--canto-campo);
+  background: var(--boldo);
+}
+
+.leitor-camera video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* A mira: uma janela clara no meio, com o resto da imagem escurecido. */
+.leitor-mira {
+  position: absolute;
+  inset: 26% 9%;
+  border: 3px solid var(--papel-alto);
+  border-radius: var(--canto-campo);
+  box-shadow: 0 0 0 100vmax rgb(23 39 29 / 0.4);
+}
+
+.leitor-camera[data-ligada='false'] .leitor-mira {
+  display: none;
+}
+
+.leitor-estado {
+  font-weight: 500;
+}
+
+.leitor-estado[data-tone='aviso'] {
+  padding: 10px 14px;
+  border-radius: var(--canto-campo);
+  background: var(--mostarda-fundo);
+  color: var(--mostarda-texto);
+}
+
+.leitor-foto {
+  justify-self: start;
+  cursor: pointer;
+}
+
+.leitor-foto:focus-within {
+  outline: 3px solid var(--folha);
+  outline-offset: 2px;
+}
+
+.leitor .campo-sufixo .botao {
+  flex: none;
+}
+
+.leitor-fechar {
+  justify-self: start;
+  min-height: 44px;
+}
+
+.leitor-achou {
+  display: grid;
+  gap: var(--e-1);
+  padding: var(--e-3) var(--e-4);
+  border-radius: var(--canto-campo);
+  background: var(--salvia-clara);
+  color: var(--boldo);
+}
+
+.leitor-achou .ajuda {
+  overflow-wrap: anywhere;
+}
+
+/* ── Tags de "pra que serve" ───────────────────────────────────────────── */
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--e-2);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--capsula);
+  background: var(--salvia);
+  color: var(--boldo);
+  font-size: var(--t-15);
+  font-weight: 600;
+}
+
+/* O campo parece um campo de texto, com as tags escolhidas dentro. */
+.tags-campo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 5px 6px;
+  border: 1.5px solid var(--linha-forte);
+  border-radius: var(--canto-campo);
+  background: var(--papel-alto);
+}
+
+.tags-campo:focus-within {
+  border-color: var(--folha);
+  outline: 3px solid var(--folha);
+  outline-offset: 0;
+}
+
+.tags-campo .tag {
+  padding-right: 0;
+}
+
+.campo .tags-campo input {
+  flex: 1 1 6rem;
+  width: auto;
+  min-width: 5rem;
+  height: 36px;
+  padding: 0 8px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+}
+
+/* 40px de toque em uma cápsula de 36px: o botão passa 2px para cima e para baixo. */
+.tag-remover {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-block: -2px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+}
+
+.tags-sugestoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag-sugestao {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-1);
+  height: 40px;
+  padding: 0 14px 0 10px;
+  border: 1.5px dashed var(--linha-forte);
+  border-radius: var(--capsula);
+  background: transparent;
+  color: var(--tinta-suave);
+  font-size: var(--t-15);
+  font-weight: 500;
+}
+
+.tag-sugestao:hover {
+  background: var(--salvia-clara);
+  color: var(--boldo);
 }
 
 .campos-lado {

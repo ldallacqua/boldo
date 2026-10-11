@@ -33,7 +33,8 @@ export interface Medicine {
   name: string;
   /** Número e medida, no formato de `formatDosage`: "500 mg", "20 mg/mL". Vazio se não há. */
   dosage: string;
-  purpose: string;
+  /** Pra que serve, em tags: "Dor", "Febre". */
+  tags: string[];
   unit: UnitKey;
   quantity: number;
   /** Avisar quando a quantidade for menor ou igual a este valor. 0 desliga o aviso. */
@@ -56,7 +57,7 @@ export interface ScheduleInput {
 export interface MedicineInput {
   name: string;
   dosage: string;
-  purpose: string;
+  tags: string[];
   unit: UnitKey;
   quantity: number;
   lowThreshold: number;

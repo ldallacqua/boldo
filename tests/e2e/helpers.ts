@@ -1,4 +1,4 @@
-import { expect, type Page, type TestInfo } from '@playwright/test';
+import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 import type { Medicine, MedicineInput } from '../../shared/types';
 
 /** A mesma senha que o playwright.config.ts passa para o servidor de teste. */
@@ -35,7 +35,7 @@ export async function createMedicine(
     await api(page)
   ).post('/api/medicines', {
     dosage: '',
-    purpose: '',
+    tags: [],
     unit: 'comprimido',
     quantity: 20,
     lowThreshold: 0,
@@ -58,3 +58,16 @@ export const row = (page: Page, name: string) =>
   page.getByRole('list').getByRole('link', { name: new RegExp(name) });
 
 export const everyDay = [0, 1, 2, 3, 4, 5, 6] as MedicineInput['schedules'][number]['days'];
+
+/** O formulário depois de ler o código das imagens de fixtures/ (Alergaliv 10 mg, 15 comprimidos). */
+export async function expectAlergaliv(sheet: Locator) {
+  await expect(sheet.getByLabel('Nome', { exact: true })).toHaveValue('Alergaliv');
+  await expect(sheet.getByLabel('Valor da dosagem')).toHaveValue('10');
+  await expect(sheet.getByLabel('Medida da dosagem')).toHaveValue('mg');
+  await expect(sheet.getByLabel('Quantidade em casa')).toHaveValue('15');
+  await expect(sheet.getByLabel('Unidade', { exact: true })).toHaveValue('comprimido');
+  await expect(sheet.getByRole('button', { name: 'Remover Alergia' })).toBeVisible();
+  await expect(sheet.getByLabel('Anotações')).toHaveValue('Princípio ativo: loratadina.');
+  await expect(sheet.getByText('Confira antes de salvar.')).toBeVisible();
+  await expect(sheet.getByText('ALERGALIV 10 MG COM CT BL')).toBeVisible();
+}

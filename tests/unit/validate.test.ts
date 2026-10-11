@@ -4,7 +4,7 @@ import { parseMedicineInput, parseSettings } from '../../shared/validate';
 const valid = {
   name: '  Dipirona  ',
   dosage: '500 mg',
-  purpose: 'Dor e febre',
+  tags: ['Dor', 'Febre'],
   unit: 'comprimido',
   quantity: 20,
   lowThreshold: 5,
@@ -36,7 +36,7 @@ describe('parseMedicineInput', () => {
     expect(result.ok && result.value).toEqual({
       name: 'Soro',
       dosage: '',
-      purpose: '',
+      tags: [],
       unit: 'comprimido',
       quantity: 0,
       lowThreshold: 0,
@@ -94,8 +94,26 @@ describe('parseMedicineInput', () => {
     expect(error({ ...valid, dosage: 500 })).toMatch(/Dosagem inválida/);
   });
 
+  it('limpa as tags, tira as repetidas e limita quantidade e tamanho', () => {
+    const tagsOf = (patch: object) => {
+      const result = parseMedicineInput({ ...valid, ...patch });
+      return result.ok ? result.value.tags : null;
+    };
+    expect(tagsOf({ tags: [' dor ', 'Dor', 'pressao alta', ''] })).toEqual(['Dor', 'Pressão alta']);
+    expect(tagsOf({ tags: undefined })).toEqual([]);
+    expect(error({ ...valid, tags: 'Dor' })).toMatch(/tags precisam ser textos/);
+    expect(error({ ...valid, tags: ['Dor', 5] })).toMatch(/tags precisam ser textos/);
+    expect(error({ ...valid, tags: ['x'.repeat(31)] })).toMatch(/até 8 tags de até 30 letras/);
+    expect(error({ ...valid, tags: 'abcdefghi'.split('') })).toMatch(/até 8 tags/);
+  });
+
+  it('aceita o texto livre de antes das tags, enviado por um app antigo em cache', () => {
+    const result = parseMedicineInput({ ...valid, tags: undefined, purpose: 'Dor e febre' });
+    expect(result.ok && result.value.tags).toEqual(['Dor', 'Febre']);
+  });
+
   it('recusa textos longos demais', () => {
-    expect(error({ ...valid, notes: 'x'.repeat(4001) })).toMatch(/longo/);
+    expect(error({ ...valid, notes: 'x'.repeat(4001) })).toMatch(/longas demais/);
   });
 });
 

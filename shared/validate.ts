@@ -1,5 +1,6 @@
 import { formatDosage, parseDosage } from './dosage';
 import { isValidExpiry } from './status';
+import { MAX_TAG_LENGTH, MAX_TAGS, normalizeTags, splitPurpose } from './tags';
 import { isValidTime } from './time';
 import {
   UNIT_KEYS,
@@ -47,10 +48,20 @@ export function parseMedicineInput(raw: unknown): Result<MedicineInput> {
   const name = text(m.name, 120);
   if (!name) return { ok: false, error: 'Informe o nome do remédio.' };
 
-  const purpose = text(m.purpose, 240);
   const notes = text(m.notes, 4000);
-  if (purpose === null || notes === null) {
-    return { ok: false, error: 'Um dos textos é longo demais.' };
+  if (notes === null) return { ok: false, error: 'As anotações são longas demais.' };
+
+  // `purpose` é o texto livre de antes das tags; um app antigo em cache ainda pode enviá-lo.
+  const rawTags = m.tags ?? (typeof m.purpose === 'string' ? splitPurpose(m.purpose) : []);
+  if (!Array.isArray(rawTags) || !rawTags.every((tag) => typeof tag === 'string')) {
+    return { ok: false, error: 'Em "Pra que serve", as tags precisam ser textos.' };
+  }
+  const tags = normalizeTags(rawTags);
+  if (tags.length > MAX_TAGS || tags.some((tag) => tag.length > MAX_TAG_LENGTH)) {
+    return {
+      ok: false,
+      error: `Em "Pra que serve", use até ${MAX_TAGS} tags de até ${MAX_TAG_LENGTH} letras.`,
+    };
   }
 
   const dosageText = text(m.dosage, 40);
@@ -94,7 +105,7 @@ export function parseMedicineInput(raw: unknown): Result<MedicineInput> {
 
   return {
     ok: true,
-    value: { name, dosage, purpose, unit, quantity, lowThreshold, expiresOn, notes, schedules },
+    value: { name, dosage, tags, unit, quantity, lowThreshold, expiresOn, notes, schedules },
   };
 }
 

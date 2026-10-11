@@ -11,3 +11,4 @@ dist-pages
 supabase/functions/api/index.js
 art
 public/mascote
+public/catalogo

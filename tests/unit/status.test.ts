@@ -16,7 +16,7 @@ const medicine = (patch: Partial<Medicine> = {}): Medicine => ({
   id: 1,
   name: 'Dipirona',
   dosage: '500 mg',
-  purpose: 'Dor e febre',
+  tags: ['Dor', 'Febre'],
   unit: 'comprimido',
   quantity: 20,
   lowThreshold: 5,

@@ -11,7 +11,7 @@ export function input(patch: Partial<MedicineInput> = {}): MedicineInput {
   return {
     name: 'Dipirona',
     dosage: '500 mg',
-    purpose: 'Dor e febre',
+    tags: ['Dor', 'Febre'],
     unit: 'comprimido',
     quantity: 20,
     lowThreshold: 5,

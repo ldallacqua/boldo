@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS, type Store } from '../../server/store';
+import { openPglite } from '../../server/db-pglite';
+import { DEFAULT_SETTINGS, Store } from '../../server/store';
 import { everyDay, input, memoryStore } from './helpers';
 
 const NOW = '2026-10-12T11:00:00.000Z';
@@ -252,5 +253,35 @@ describe('tentativas de senha', () => {
     await store.clearLoginFailures('1.1.1.1');
     expect(await store.loginFailures('1.1.1.1', 1100)).toBe(0);
     expect(await store.loginFailures('2.2.2.2', 1100)).toBe(1);
+  });
+});
+
+describe('banco criado por uma versão anterior', () => {
+  it('transforma o texto de "pra que serve" em tags, sem perder os remédios', async () => {
+    const db = await openPglite();
+    const old = new Store(db);
+    await old.init();
+    // Volta a tabela ao formato de antes das tags.
+    await db.exec(`
+      ALTER TABLE boldo.medicines DROP COLUMN tags;
+      ALTER TABLE boldo.medicines ADD COLUMN purpose text NOT NULL DEFAULT '';
+      INSERT INTO boldo.medicines (name, purpose, created_at, updated_at) VALUES
+        ('Dipirona', 'Dor e febre', '${NOW}', '${NOW}'),
+        ('Soro', '', '${NOW}', '${NOW}');
+    `);
+
+    const migrated = new Store(db);
+    await migrated.init();
+    const medicines = await migrated.listMedicines();
+    expect(medicines.map((m) => [m.name, m.tags])).toEqual([
+      ['Dipirona', ['Dor', 'Febre']],
+      ['Soro', []],
+    ]);
+
+    // Subir de novo não muda nada, e o banco aceita remédios novos.
+    await migrated.init();
+    const created = await migrated.createMedicine(input({ tags: ['Alergia'] }), NOW);
+    expect((await migrated.getMedicine(created.id))?.tags).toEqual(['Alergia']);
+    await db.close();
   });
 });

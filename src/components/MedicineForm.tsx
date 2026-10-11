@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react';
+import type { CatalogMatch } from '../../shared/catalog';
 import { DOSAGE_UNITS, formatDosage, parseDosage, type DosageUnit } from '../../shared/dosage';
+import { normalizeTags, SUGGESTED_TAGS } from '../../shared/tags';
 import {
   ALL_DAYS,
   UNIT_KEYS,
@@ -10,8 +12,10 @@ import {
   type Weekday,
 } from '../../shared/types';
 import { parseMedicineInput } from '../../shared/validate';
+import { TagInput } from './TagInput';
 import { MONTHS } from '../lib/dates';
 import { useSaveMedicine } from '../lib/queries';
+import { BarcodeScanner } from './BarcodeScanner';
 import { Icon } from './Icon';
 import { useToast } from './Toast';
 
@@ -27,7 +31,9 @@ interface Draft {
   name: string;
   dosageAmount: string;
   dosageUnit: DosageUnit;
-  purpose: string;
+  tags: string[];
+  /** O que está digitado no campo de tags e ainda não virou tag. */
+  tagText: string;
   unit: UnitKey;
   quantity: string;
   lowThreshold: string;
@@ -50,7 +56,8 @@ function toDraft(medicine: Medicine | null): Draft {
     name: medicine?.name ?? '',
     dosageAmount: dosage ? String(dosage.amount) : '',
     dosageUnit: dosage?.unit ?? 'mg',
-    purpose: medicine?.purpose ?? '',
+    tags: medicine?.tags ?? [],
+    tagText: '',
     unit: medicine?.unit ?? 'comprimido',
     quantity: medicine ? String(medicine.quantity) : '',
     lowThreshold: medicine?.lowThreshold ? String(medicine.lowThreshold) : '',
@@ -77,7 +84,7 @@ function toInput(draft: Draft): MedicineInput {
       draft.dosageAmount.trim() === ''
         ? ''
         : formatDosage({ amount: toNumber(draft.dosageAmount), unit: draft.dosageUnit }),
-    purpose: draft.purpose,
+    tags: [...draft.tags, draft.tagText],
     unit: draft.unit,
     quantity: toNumber(draft.quantity),
     lowThreshold: toNumber(draft.lowThreshold),
@@ -95,13 +102,17 @@ function toInput(draft: Draft): MedicineInput {
 
 interface MedicineFormProps {
   medicine: Medicine | null;
+  /** Tags já usadas em outros remédios, oferecidas antes das sugestões gerais. */
+  usedTags?: string[];
   onSaved: (medicine: Medicine) => void;
   onCancel: () => void;
 }
 
-export function MedicineForm({ medicine, onSaved, onCancel }: MedicineFormProps) {
+export function MedicineForm({ medicine, usedTags = [], onSaved, onCancel }: MedicineFormProps) {
   const [draft, setDraft] = useState(() => toDraft(medicine));
   const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanned, setScanned] = useState<CatalogMatch | null>(null);
   const save = useSaveMedicine(medicine?.id ?? null);
   const toast = useToast();
 
@@ -113,6 +124,30 @@ export function MedicineForm({ medicine, onSaved, onCancel }: MedicineFormProps)
       'schedules',
       draft.schedules.map((s) => (s.key === key ? { ...s, ...patch } : s)),
     );
+
+  /** Põe no formulário o que a lista da Anvisa diz da caixa lida. A pessoa confere e salva. */
+  const applyMatch = (match: CatalogMatch) => {
+    const { prefill } = match;
+    const dosage = parseDosage(prefill.dosage);
+    setDraft((current) => ({
+      ...current,
+      name: prefill.name,
+      dosageAmount: dosage ? String(dosage.amount) : '',
+      dosageUnit: dosage?.unit ?? current.dosageUnit,
+      unit: prefill.unit,
+      quantity: String(prefill.quantity),
+      tags: prefill.tags.length > 0 ? prefill.tags : current.tags,
+      tagText: '',
+      notes:
+        !prefill.notes || current.notes.includes(prefill.notes)
+          ? current.notes
+          : [current.notes.trim(), prefill.notes].filter(Boolean).join('\n'),
+    }));
+    setScanned(match);
+    setScanning(false);
+    setError(null);
+    toast('Dados da caixa preenchidos');
+  };
 
   const thisYear = new Date().getFullYear();
   const years = Array.from({ length: 14 }, (_, i) => String(thisYear - 2 + i));
@@ -140,9 +175,37 @@ export function MedicineForm({ medicine, onSaved, onCancel }: MedicineFormProps)
   };
 
   const unitPlural = UNITS[draft.unit][1];
+  const tagSuggestions = normalizeTags([...usedTags, ...SUGGESTED_TAGS]);
 
   return (
     <form className="formulario" onSubmit={onSubmit} noValidate>
+      {!medicine &&
+        (scanning ? (
+          <BarcodeScanner onMatch={applyMatch} onClose={() => setScanning(false)} />
+        ) : (
+          <button
+            type="button"
+            className="botao leitor-abrir"
+            data-variant="secundario"
+            onClick={() => setScanning(true)}
+          >
+            <Icon name="scan" size={20} />
+            {scanned ? 'Ler outro código de barras' : 'Ler código de barras'}
+          </button>
+        ))}
+
+      {scanned && !scanning && (
+        <div className="leitor-achou" role="status">
+          <p>
+            <strong>Confira antes de salvar.</strong> Os campos vieram da lista da Anvisa, e a
+            quantidade é a de uma caixa cheia.
+          </p>
+          <p className="ajuda">
+            {scanned.label} ({scanned.laboratory})
+          </p>
+        </div>
+      )}
+
       <div className="campo">
         <label htmlFor="nome">Nome</label>
         <input
@@ -184,16 +247,14 @@ export function MedicineForm({ medicine, onSaved, onCancel }: MedicineFormProps)
         <p className="ajuda">Como está na caixa. Deixe o número em branco se não houver.</p>
       </fieldset>
 
-      <div className="campo">
-        <label htmlFor="serve">Pra que serve</label>
-        <input
-          id="serve"
-          value={draft.purpose}
-          onChange={(e) => set('purpose', e.target.value)}
-          placeholder="Dor e febre"
-          autoComplete="off"
-        />
-      </div>
+      <TagInput
+        id="serve"
+        label="Pra que serve"
+        tags={draft.tags}
+        text={draft.tagText}
+        suggestions={tagSuggestions}
+        onChange={(tags, tagText) => setDraft((current) => ({ ...current, tags, tagText }))}
+      />
 
       <div className="campos-lado">
         <div className="campo">

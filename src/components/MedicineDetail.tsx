@@ -55,7 +55,17 @@ export function MedicineDetail({
   return (
     <div className="detalhe" data-tone={health.tone}>
       {medicine.dosage && <p className="detalhe-dosagem">{medicine.dosage}</p>}
-      <p className="detalhe-serve">{medicine.purpose || 'Sem descrição de para que serve.'}</p>
+      {medicine.tags.length > 0 ? (
+        <ul className="tags" aria-label="Pra que serve">
+          {medicine.tags.map((tag) => (
+            <li key={tag} className="tag">
+              {tag}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="detalhe-serve">Sem tags de para que serve.</p>
+      )}
 
       <section className="estoque" aria-label="Quantidade em casa">
         <div className="estoque-controle">

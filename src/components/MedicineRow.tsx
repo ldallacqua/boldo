@@ -20,7 +20,7 @@ export function MedicineRow({ medicine, health }: MedicineRowProps) {
             {medicine.name}
             {medicine.dosage && <span className="caixa-dosagem">{medicine.dosage}</span>}
           </p>
-          <p className="caixa-serve">{medicine.purpose || 'Sem descrição'}</p>
+          <p className="caixa-serve">{medicine.tags.join(', ') || 'Sem tags'}</p>
         </div>
 
         <div className="caixa-meta">
