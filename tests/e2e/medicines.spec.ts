@@ -349,17 +349,49 @@ test('o painel entra deslizando, do lado de fora até o lugar', async ({ page },
   await page.goto('/remedios');
   await expect(row(page, medicine.name)).toBeVisible();
   const wide = (page.viewportSize()?.width ?? 0) >= 720;
-  /** Onde o painel está na tela (borda esquerda ou topo) e quanto o <dialog> rolou. */
-  const sample = () =>
-    page.evaluate((horizontal) => {
+
+  // Um observador dentro da página anota, quadro a quadro, onde o painel esteve e quanto o
+  // <dialog> rolou. Medir daqui de fora dependeria da pressa do teste: em máquina lenta a
+  // primeira medida já chegaria com a entrada terminada.
+  await page.evaluate((horizontal) => {
+    const seen = { farthest: -Infinity, scrolled: 0 };
+    (window as unknown as { entrance: typeof seen }).entrance = seen;
+    const measure = () => {
       const panel = document.querySelector('.sheet-panel');
       const dialog = document.querySelector('.sheet');
-      if (!panel || !dialog) return null;
+      if (!panel || !dialog) return;
       const box = panel.getBoundingClientRect();
-      return {
-        edge: horizontal ? box.left : box.top,
-        scrolled: dialog.scrollLeft + dialog.scrollTop,
-      };
+      seen.farthest = Math.max(seen.farthest, horizontal ? box.left : box.top);
+      seen.scrolled = Math.max(seen.scrolled, dialog.scrollLeft + dialog.scrollTop);
+    };
+    const everyFrame = () => {
+      measure();
+      requestAnimationFrame(everyFrame);
+    };
+    requestAnimationFrame(everyFrame);
+    // E também assim que o painel entra no DOM, sem esperar o próximo quadro.
+    new MutationObserver(measure).observe(document.body, { childList: true, subtree: true });
+  }, wide);
+  const entrance = () =>
+    page.evaluate(() => {
+      const seen = (window as unknown as { entrance: { farthest: number; scrolled: number } })
+        .entrance;
+      const result = { ...seen };
+      seen.farthest = -Infinity;
+      seen.scrolled = 0;
+      return result;
+    });
+  const settledEdge = () =>
+    page.evaluate(async (horizontal) => {
+      const panel = document.querySelector('.sheet-panel')!;
+      await Promise.all(
+        panel
+          .getAnimations()
+          .filter((animation) => animation.timeline === document.timeline)
+          .map((animation) => animation.finished),
+      );
+      const box = panel.getBoundingClientRect();
+      return horizontal ? box.left : box.top;
     }, wide);
 
   for (const open of [
@@ -367,15 +399,14 @@ test('o painel entra deslizando, do lado de fora até o lugar', async ({ page },
     // O formulário novo põe o cursor no nome: o foco não pode puxar o painel para dentro.
     () => page.getByRole('link', { name: 'Adicionar remédio' }).click(),
   ]) {
+    await entrance();
     await open();
-    await expect.poll(sample).not.toBeNull();
-    const first = (await sample())!;
-    await page.waitForTimeout(700);
-    const settled = (await sample())!;
-    // Começou mais para fora do que termina, e o <dialog> nunca rolou para "ajudar".
-    expect(first.edge).toBeGreaterThan(settled.edge + 20);
-    expect(first.scrolled).toBe(0);
-    expect(settled.scrolled).toBe(0);
+    await expect(page.getByRole('dialog')).toBeVisible();
+    const settled = await settledEdge();
+    const seen = await entrance();
+    // Esteve bem mais para fora do que terminou, e o <dialog> nunca rolou para "ajudar".
+    expect(seen.farthest).toBeGreaterThan(settled + 100);
+    expect(seen.scrolled).toBe(0);
     await page.getByRole('dialog').getByRole('button', { name: 'Fechar' }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
   }
