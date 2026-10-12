@@ -42,6 +42,12 @@ describe('toNotification', () => {
     });
   });
 
+  it('a repetição do lembrete toca de novo no lugar do primeiro', () => {
+    const { options } = toNotification({ ...dosePayload, renotify: true }, SCOPE);
+    expect(options).toMatchObject({ tag: dosePayload.tag, renotify: true });
+    expect(toNotification(dosePayload, SCOPE).options).not.toHaveProperty('renotify');
+  });
+
   it('aviso de estoque não tem botão', () => {
     expect(toNotification(stockPayload, SCOPE).options.actions).toEqual([]);
   });

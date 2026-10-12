@@ -538,6 +538,15 @@ export class Store {
     return claimed.length > 0;
   }
 
+  /** Quando um aviso foi enviado (ISO), ou `null` se ainda não foi. */
+  async notificationSentAt(key: string): Promise<string | null> {
+    const [row] = await this.db.query<{ sent_at: string }>(
+      'SELECT sent_at FROM boldo.notification_log WHERE key = $1',
+      [key],
+    );
+    return row?.sent_at ?? null;
+  }
+
   async pruneNotificationLog(before: string): Promise<void> {
     await this.db.query('DELETE FROM boldo.notification_log WHERE sent_at < $1', [before]);
   }

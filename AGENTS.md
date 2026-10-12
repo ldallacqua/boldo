@@ -113,7 +113,10 @@ scripts/             generate-icons.mjs, build-edge.mjs, serve-pages.mjs (Pages 
 Supabase) e pode rodar quantas vezes for, até em paralelo, sem repetir aviso:
 
 - **Dose**: sai se o horário já chegou há no máximo 60 min, não há registro da dose e a
-  chave `dose:<scheduleId>:<data>` ainda não está em `notification_log`.
+  chave `dose:<scheduleId>:<data>` ainda não está em `notification_log`. Se 30 min depois
+  desse primeiro aviso a dose continua sem registro (e não passou de 2 h do horário), sai
+  **uma** repetição ("Ainda falta tomar…", chave `…:de-novo`), com a mesma `tag` e
+  `renotify`, para entrar no lugar do primeiro aviso em vez de empilhar.
 - **Estoque e validade**: cada remédio guarda o último estágio avisado (`stock_stage`,
   `expiry_stage`: 0 nada, 1 acabando/vencendo, 2 acabou/venceu). Só avisa quando o estágio
   **sobe**; quando desce (repôs, corrigiu a validade), rearma na hora. Só saem entre
@@ -182,6 +185,9 @@ Fica em `src/styles/motion.css` (carregado depois de `app.css`), com as duraçõ
 - **Troca de aba**: View Transitions (`withViewTransition` em `src/lib/motion.ts`, ligado no
   `aroundNav` do roteador em `main.tsx`). A navegação fica parada e a tarja desliza até o
   item novo. Abrir e fechar um remédio não passa por aí: é o `Sheet` que anima.
+- **Edição por salvar**: o formulário avisa o painel (`onDirtyChange` → `unsaved`), e o painel
+  pergunta antes de fechar, voltar ou ser arrastado. Um remédio aberto pela tela Hoje leva
+  `state={{ voltar: '/' }}` no link e volta para ela ao fechar.
 - **Painel**: entra por CSS e sai por WAAPI (`dismiss()`), e só depois troca a rota. Quem
   fecha o painel chama `close()` de `pages/Medicines.tsx`, não `navigate()` direto. No
   celular dá para arrastar pelo cabeçalho; soltar depois de 120px (ou com um puxão rápido)

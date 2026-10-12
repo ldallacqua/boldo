@@ -121,3 +121,17 @@ test('tomar a última dose faz o remédio aparecer como acabado', async ({ page 
     'Acabou',
   );
 });
+
+test('um remédio aberto pela tela Hoje volta para ela ao fechar', async ({ page }, info) => {
+  const medicine = await createMedicine(page, { name: unique(info, 'Volta'), quantity: 0 });
+  await page.goto('/');
+  await page
+    .getByRole('region', { name: 'Precisa de atenção' })
+    .getByRole('link', { name: new RegExp(medicine.name) })
+    .click();
+  const sheet = page.getByRole('dialog');
+  await expect(sheet.getByRole('link', { name: 'Editar' })).toBeVisible();
+  await sheet.getByRole('button', { name: 'Fechar' }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Doses de hoje' })).toBeVisible();
+});

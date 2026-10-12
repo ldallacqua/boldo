@@ -10,6 +10,7 @@ export interface NotificationAction {
 // `actions` existe nos navegadores, mas ainda não está nos tipos do DOM.
 export type NotificationOptionsWithActions = NotificationOptions & {
   actions: NotificationAction[];
+  renotify?: boolean;
 };
 
 /** `scope` é o endereço-base do app (termina em barra), ex.: https://exemplo.com/boldo/ */
@@ -26,6 +27,7 @@ export function toNotification(
       badge: new URL('icons/badge-96.png', scope).href,
       lang: 'pt-BR',
       data: payload,
+      ...(payload.renotify ? { renotify: true } : {}),
       // Só lembrete de dose tem o que responder direto da notificação.
       actions: payload.dose ? [{ action: 'take', title: 'Tomei' }] : [],
     },

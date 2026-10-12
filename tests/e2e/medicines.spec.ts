@@ -289,3 +289,48 @@ test('com movimento reduzido no sistema, o painel abre e fecha sem animação', 
   await sheet.getByRole('button', { name: 'Fechar' }).click();
   await expect(sheet).toHaveCount(0);
 });
+
+test('fechar o formulário com edição por salvar pergunta antes de descartar', async ({
+  page,
+}, info) => {
+  const medicine = await createMedicine(page, { name: unique(info, 'Rascunho') });
+  await page.goto(`/remedios/${medicine.id}/editar`);
+  const sheet = page.getByRole('dialog');
+  const question = sheet.getByRole('alertdialog');
+
+  // Sem mexer em nada, fecha direto.
+  await sheet.getByRole('button', { name: 'Voltar' }).click();
+  await expect(sheet.getByRole('link', { name: 'Editar' })).toBeVisible();
+
+  await sheet.getByRole('link', { name: 'Editar' }).click();
+  await sheet.getByLabel('Anotações').fill('Tomar com água');
+  await sheet.getByRole('button', { name: 'Fechar' }).click();
+  await expect(question).toContainText('Descartar o que você mudou');
+  await question.getByRole('button', { name: 'Continuar editando' }).click();
+  await expect(sheet.getByLabel('Anotações')).toHaveValue('Tomar com água');
+
+  await sheet.getByRole('button', { name: 'Cancelar' }).click();
+  await question.getByRole('button', { name: 'Descartar' }).click();
+  await expect(sheet.getByRole('link', { name: 'Editar' })).toBeVisible();
+  await expect(sheet).toContainText('Nenhuma anotação');
+
+  // Salvar não é descartar: não pergunta nada.
+  await sheet.getByRole('link', { name: 'Editar' }).click();
+  await sheet.getByLabel('Anotações').fill('Tomar com água');
+  await sheet.getByRole('button', { name: 'Salvar remédio' }).click();
+  await expect(sheet).toContainText('Tomar com água');
+  await sheet.getByRole('button', { name: 'Fechar' }).click();
+  await expect(sheet).toHaveCount(0);
+});
+
+test('cada horário novo sugere uma hora diferente', async ({ page }) => {
+  await page.goto('/remedios/novo');
+  const sheet = page.getByRole('dialog');
+  const add = sheet.getByRole('button', { name: 'Adicionar horário' });
+  await add.click();
+  await add.click();
+  await add.click();
+  await expect(sheet.getByLabel('Horário 1', { exact: true })).toHaveValue('08:00');
+  await expect(sheet.getByLabel('Horário 2', { exact: true })).toHaveValue('20:00');
+  await expect(sheet.getByLabel('Horário 3', { exact: true })).toHaveValue('14:00');
+});

@@ -13,6 +13,8 @@ import { Icon } from './Icon';
 export interface SheetHandle {
   /** Fecha com a animação de saída e só então chama `onClose`. */
   dismiss: () => void;
+  /** O mesmo que tocar em "voltar": pergunta antes, se houver edição não salva. */
+  back: () => void;
 }
 
 interface SheetProps {
@@ -22,6 +24,8 @@ interface SheetProps {
   onBack?: () => void;
   /** Muda quando o painel troca de conteúdo (detalhe ↔ edição): o novo entra com um esmaecer. */
   view?: string;
+  /** Há edição não salva: antes de fechar ou voltar, o painel pergunta se pode descartar. */
+  unsaved?: boolean;
   ref?: Ref<SheetHandle>;
   children: ReactNode;
 }
@@ -35,7 +39,7 @@ const DISMISS_SPEED = 0.6;
  * Painel modal: sobe de baixo no celular e entra pela direita em telas largas. No celular
  * dá para puxar pelo cabeçalho e arrastar para baixo até fechar.
  */
-export function Sheet({ title, onClose, onBack, view, ref, children }: SheetProps) {
+export function Sheet({ title, onClose, onBack, view, unsaved, ref, children }: SheetProps) {
   const dialog = useRef<HTMLDialogElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const drag = useRef<{ y: number; time: number; offset: number; speed: number } | null>(null);
@@ -43,6 +47,14 @@ export function Sheet({ title, onClose, onBack, view, ref, children }: SheetProp
   // Enquanto o painel sai, o conteúdo fica como estava (um remédio excluído não vira
   // "não encontrado" no meio da animação).
   const [frozen, setFrozen] = useState<ReactNode>(null);
+  // O que a pessoa pediu (fechar, voltar) e está esperando ela confirmar o descarte.
+  const [pending, setPending] = useState<(() => void) | null>(null);
+
+  /** Faz `action` já, ou só depois de a pessoa aceitar perder o que editou. */
+  const attempt = (action: () => void) => {
+    if (unsaved) setPending(() => action);
+    else action();
+  };
 
   useEffect(() => {
     const element = dialog.current!;
@@ -69,7 +81,10 @@ export function Sheet({ title, onClose, onBack, view, ref, children }: SheetProp
     animation.finished.then(onClose, onClose);
   };
 
-  useImperativeHandle(ref, () => ({ dismiss: () => dismiss() }));
+  useImperativeHandle(ref, () => ({
+    dismiss: () => attempt(() => dismiss()),
+    back: () => onBack && attempt(onBack),
+  }));
 
   const onPointerDown = (event: ReactPointerEvent) => {
     if (window.matchMedia(WIDE).matches || closing.current) return;
@@ -99,11 +114,13 @@ export function Sheet({ title, onClose, onBack, view, ref, children }: SheetProp
     const state = drag.current;
     drag.current = null;
     if (!state || !panel.current) return;
-    if (state.offset > DISMISS_DISTANCE || state.speed > DISMISS_SPEED) {
+    if (!unsaved && (state.offset > DISMISS_DISTANCE || state.speed > DISMISS_SPEED)) {
       panel.current.style.translate = '';
       dismiss(state.offset);
       return;
     }
+    // Com edição por salvar o painel volta ao lugar e pergunta, em vez de sumir com ela.
+    if (unsaved && state.offset > DISMISS_DISTANCE) setPending(() => () => dismiss());
     panel.current.style.transition = '';
     panel.current.style.translate = '';
     dialog.current?.style.removeProperty('--arrasto');
@@ -116,10 +133,15 @@ export function Sheet({ title, onClose, onBack, view, ref, children }: SheetProp
       aria-labelledby="sheet-title"
       onCancel={(event) => {
         event.preventDefault();
-        dismiss();
+        attempt(() => dismiss());
+      }}
+      // O navegador pode fechar o <dialog> por conta própria (dois Esc seguidos no Chrome):
+      // a rota acompanha, para não sobrar um painel fechado com o endereço dele.
+      onClose={() => {
+        if (!closing.current && !dialog.current?.open) onClose();
       }}
       onClick={(event) => {
-        if (event.target === dialog.current) dismiss();
+        if (event.target === dialog.current) attempt(() => dismiss());
       }}
     >
       <div ref={panel} className="sheet-panel" tabIndex={-1}>
@@ -132,7 +154,12 @@ export function Sheet({ title, onClose, onBack, view, ref, children }: SheetProp
         >
           <span className="sheet-puxador" aria-hidden="true" />
           {onBack ? (
-            <button type="button" className="icon-button" onClick={onBack} aria-label="Voltar">
+            <button
+              type="button"
+              className="icon-button"
+              onClick={() => attempt(onBack)}
+              aria-label="Voltar"
+            >
               <Icon name="back" />
             </button>
           ) : (
@@ -144,7 +171,7 @@ export function Sheet({ title, onClose, onBack, view, ref, children }: SheetProp
           <button
             type="button"
             className="icon-button"
-            onClick={() => dismiss()}
+            onClick={() => attempt(() => dismiss())}
             aria-label="Fechar"
           >
             <Icon name="close" />
@@ -155,6 +182,33 @@ export function Sheet({ title, onClose, onBack, view, ref, children }: SheetProp
             {frozen ?? children}
           </div>
         </div>
+        {pending && (
+          <div className="sheet-pergunta" role="alertdialog" aria-labelledby="sheet-pergunta">
+            <p id="sheet-pergunta">Descartar o que você mudou neste remédio?</p>
+            <div className="acoes">
+              <button
+                type="button"
+                className="botao"
+                data-variant="perigo"
+                onClick={() => {
+                  setPending(null);
+                  pending();
+                }}
+              >
+                Descartar
+              </button>
+              <button
+                type="button"
+                className="botao"
+                data-variant="secundario"
+                autoFocus
+                onClick={() => setPending(null)}
+              >
+                Continuar editando
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </dialog>
   );

@@ -961,3 +961,25 @@
 .sheet-panel:focus {
   outline: 0;
 }
+
+/* ── Painel: a pergunta antes de descartar o que foi editado ───────────── */
+
+.sheet-pergunta {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 2;
+  display: grid;
+  gap: var(--e-3);
+  padding: var(--e-4) var(--e-5) calc(var(--e-5) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--linha-forte);
+  background: var(--papel-alto);
+  box-shadow: 0 -12px 32px -12px var(--veu);
+  font-weight: 600;
+  animation: surge var(--medio) var(--sai);
+}
+
+/* Em telas estreitas os dois botões dividem a linha em vez de empilhar. */
+.acoes-fixas .botao,
+.sheet-pergunta .botao {
+  flex: 1 1 auto;
+}

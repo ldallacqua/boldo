@@ -36,6 +36,9 @@ function nextSentence(progress: DayProgress, doses: DoseToday[]): string | null 
     : `Próxima: ${next.medicineName} às ${next.time}, ${formatWait(progress.minutesToNext)}.`;
 }
 
+/** Vai junto com o link de um remédio: ao fechar o painel, a pessoa volta para cá. */
+const FROM_TODAY = { voltar: '/' };
+
 const RING = 2 * Math.PI * 26;
 /** Para onde voa cada folha da comemoração: ângulo (graus) e distância (px). */
 const LEAVES = [
@@ -145,7 +148,9 @@ function DoseItem({
       <div className="dose-corpo">
         <div>
           <p className="dose-nome">
-            <Link href={`/remedios/${dose.medicineId}`}>{dose.medicineName}</Link>
+            <Link href={`/remedios/${dose.medicineId}`} state={FROM_TODAY}>
+              {dose.medicineName}
+            </Link>
             {dose.dosage && <span className="caixa-dosagem">{dose.dosage}</span>}
           </p>
           <p className="dose-detalhe">
@@ -297,6 +302,7 @@ export function Today() {
                 <li key={medicine.id} style={{ '--i': index } as CSSProperties}>
                   <Link
                     href={`/remedios/${medicine.id}`}
+                    state={FROM_TODAY}
                     className="caixa caixa-aviso"
                     data-tone={health.tone}
                   >

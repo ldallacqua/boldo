@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import type { CatalogMatch } from '../../shared/catalog';
 import { DOSAGE_UNITS, formatDosage, parseDosage, type DosageUnit } from '../../shared/dosage';
 import { normalizeTags, SUGGESTED_TAGS } from '../../shared/tags';
@@ -107,10 +107,26 @@ interface MedicineFormProps {
   usedTags?: string[];
   onSaved: (medicine: Medicine) => void;
   onCancel: () => void;
+  /** Avisa quando passa a haver (ou deixa de haver) edição não salva. */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
-export function MedicineForm({ medicine, usedTags = [], onSaved, onCancel }: MedicineFormProps) {
+/** Horário sugerido para o próximo lembrete: manhã, depois noite, depois o meio da tarde. */
+const DEFAULT_TIMES = ['08:00', '20:00', '14:00'];
+function nextTime(schedules: ScheduleDraft[]): string {
+  const taken = new Set(schedules.map((schedule) => schedule.time));
+  return DEFAULT_TIMES.find((time) => !taken.has(time)) ?? '08:00';
+}
+
+export function MedicineForm({
+  medicine,
+  usedTags = [],
+  onSaved,
+  onCancel,
+  onDirtyChange,
+}: MedicineFormProps) {
   const [draft, setDraft] = useState(() => toDraft(medicine));
+  const [initial] = useState(() => JSON.stringify(draft));
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanned, setScanned] = useState<CatalogMatch | null>(null);
@@ -120,6 +136,14 @@ export function MedicineForm({ medicine, usedTags = [], onSaved, onCancel }: Med
   // null: a pessoa não mexeu, vale o que o aparelho já tem (remédio novo começa avisando).
   const [notifyChoice, setNotifyChoice] = useState<boolean | null>(null);
   const notify = notifyChoice ?? (medicine ? alerts.notifies(medicine.id) : true);
+
+  // Depois de salvar não há mais o que perder, mesmo com o rascunho ainda diferente do original.
+  const [saved, setSaved] = useState(false);
+  const dirty = !saved && JSON.stringify(draft) !== initial;
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+    return () => onDirtyChange?.(false);
+  }, [dirty, onDirtyChange]);
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((current) => ({ ...current, [key]: value }));
@@ -178,6 +202,7 @@ export function MedicineForm({ medicine, usedTags = [], onSaved, onCancel }: Med
             .catch(() => toast('Não deu para guardar a escolha de aviso deste aparelho', 'error'));
         }
         toast('Remédio salvo');
+        setSaved(true);
         onSaved(saved);
       },
       onError: (failure) => setError(failure.message),
@@ -426,7 +451,7 @@ export function MedicineForm({ medicine, usedTags = [], onSaved, onCancel }: Med
           onClick={() =>
             set('schedules', [
               ...draft.schedules,
-              { key: newKey(), time: '08:00', dose: '1', days: ALL_DAYS },
+              { key: newKey(), time: nextTime(draft.schedules), dose: '1', days: ALL_DAYS },
             ])
           }
         >

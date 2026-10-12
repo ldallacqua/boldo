@@ -35,6 +35,11 @@ export function Medicines() {
   const [filter, setFilter] = useState<Filter>('todos');
   const [tag, setTag] = useState<string | null>(null);
   const sheet = useRef<SheetHandle>(null);
+  const [dirty, setDirty] = useState(false);
+  // De onde o remédio foi aberto: quem veio da tela Hoje volta para ela ao fechar.
+  const [origin] = useState(
+    () => (window.history.state as { voltar?: string } | null)?.voltar ?? '/remedios',
+  );
 
   const [isNew] = useRoute('/remedios/novo');
   const [isEdit, editParams] = useRoute('/remedios/:id/editar');
@@ -70,7 +75,7 @@ export function Medicines() {
         )),
   );
   const open = all.find(({ medicine }) => medicine.id === openId);
-  const leave = () => navigate('/remedios');
+  const leave = () => navigate(origin);
   /** Fecha o painel com a animação de saída; `leave` troca a rota quando ela termina. */
   const close = () => (sheet.current ? sheet.current.dismiss() : leave());
 
@@ -175,8 +180,13 @@ export function Medicines() {
           ref={sheet}
           title={isNew ? 'Novo remédio' : open ? open.medicine.name : 'Remédio não encontrado'}
           view={isNew ? 'novo' : isEdit ? 'editar' : 'detalhe'}
+          unsaved={dirty}
           onClose={leave}
-          onBack={isEdit && open ? () => navigate(`/remedios/${open.medicine.id}`) : undefined}
+          onBack={
+            isEdit && open
+              ? () => navigate(`/remedios/${open.medicine.id}`, { replace: true })
+              : undefined
+          }
         >
           {isNew ? (
             <MedicineForm
@@ -184,6 +194,7 @@ export function Medicines() {
               usedTags={usedTags}
               onSaved={(saved) => navigate(`/remedios/${saved.id}`, { replace: true })}
               onCancel={close}
+              onDirtyChange={setDirty}
             />
           ) : !open ? (
             <p className="secao-vazia">Ele pode ter sido excluído em outro aparelho.</p>
@@ -192,8 +203,9 @@ export function Medicines() {
               key={open.medicine.id}
               medicine={open.medicine}
               usedTags={usedTags}
-              onSaved={() => navigate(`/remedios/${open.medicine.id}`)}
-              onCancel={() => navigate(`/remedios/${open.medicine.id}`)}
+              onSaved={() => navigate(`/remedios/${open.medicine.id}`, { replace: true })}
+              onCancel={() => sheet.current?.back()}
+              onDirtyChange={setDirty}
             />
           ) : (
             <MedicineDetail medicine={open.medicine} health={open.health} onDeleted={close} />

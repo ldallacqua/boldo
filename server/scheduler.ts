@@ -1,5 +1,5 @@
 import { formatDays, formatExpiry, formatQuantity } from '../shared/format';
-import { isReminderDue } from '../shared/schedule';
+import { isReminderDue, isRepeatDue } from '../shared/schedule';
 import { healthOf } from '../shared/status';
 import { localNow } from '../shared/time';
 import type { Medicine, PushPayload } from '../shared/types';
@@ -24,14 +24,17 @@ function doseReminder(
   scheduleId: number,
   date: string,
   token: string,
+  repeat = false,
 ): PushPayload {
   const schedule = medicine.schedules.find((s) => s.id === scheduleId)!;
   const detail = medicine.dosage ? ` (${medicine.dosage})` : '';
   return {
-    title: `Hora de tomar ${medicine.name}`,
+    title: repeat ? `Ainda falta tomar ${medicine.name}` : `Hora de tomar ${medicine.name}`,
     body: `${formatQuantity(schedule.dose, medicine.unit)}${detail} às ${schedule.time}`,
+    // A mesma tag do primeiro: a repetição entra no lugar dele, em vez de empilhar.
     tag: `dose-${scheduleId}-${date}`,
     url: '/',
+    ...(repeat ? { renotify: true } : {}),
     dose: { scheduleId, date, token },
   };
 }
@@ -99,11 +102,26 @@ export async function runTick(
   const recorded = new Set(intakes.map((intake) => intake.schedule_id));
   for (const medicine of medicines) {
     for (const schedule of medicine.schedules) {
-      if (!isReminderDue(schedule, now) || recorded.has(schedule.id)) continue;
-      if (await store.claimNotification(`dose:${schedule.id}:${now.date}`, nowIso)) {
-        const token = tokens.dose(schedule.id, now.date);
+      if (recorded.has(schedule.id)) continue;
+      const key = `dose:${schedule.id}:${now.date}`;
+      const token = tokens.dose(schedule.id, now.date);
+      if (isReminderDue(schedule, now) && (await store.claimNotification(key, nowIso))) {
         outbox.push({
           payload: doseReminder(medicine, schedule.id, now.date, token),
+          medicineId: medicine.id,
+        });
+        continue;
+      }
+      // Ninguém registrou: lembra mais uma vez, e só uma.
+      const firstAt = await store.notificationSentAt(key);
+      if (!firstAt) continue;
+      const sinceFirst = (instant.getTime() - Date.parse(firstAt)) / 60_000;
+      if (
+        isRepeatDue(schedule, now, sinceFirst) &&
+        (await store.claimNotification(`${key}:de-novo`, nowIso))
+      ) {
+        outbox.push({
+          payload: doseReminder(medicine, schedule.id, now.date, token, true),
           medicineId: medicine.id,
         });
       }

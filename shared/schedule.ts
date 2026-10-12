@@ -7,6 +7,12 @@ export const LATE_AFTER_MINUTES = 30;
 /** Janela em que o lembrete ainda é enviado se o servidor esteve fora do ar no horário. */
 export const REMINDER_GRACE_MINUTES = 60;
 
+/** Sem registro da dose, o lembrete é repetido uma vez, este tempo depois do primeiro. */
+export const REPEAT_AFTER_MINUTES = 30;
+
+/** Depois disto (contado do horário da dose) o lembrete não é mais repetido. */
+export const REPEAT_UNTIL_MINUTES = 120;
+
 export function isScheduledOn(schedule: Pick<Schedule, 'days'>, weekday: number): boolean {
   return schedule.days.includes(weekday as Schedule['days'][number]);
 }
@@ -29,6 +35,22 @@ export function isReminderDue(
   if (!isScheduledOn(schedule, now.weekday)) return false;
   const elapsed = minutesOf(now.time) - minutesOf(schedule.time);
   return elapsed >= 0 && elapsed <= graceMinutes;
+}
+
+/**
+ * A dose segue sem registro: é hora de lembrar de novo? `minutesSinceFirst` é quanto tempo
+ * faz que o primeiro lembrete saiu.
+ */
+export function isRepeatDue(
+  schedule: Pick<Schedule, 'time' | 'days'>,
+  now: LocalNow,
+  minutesSinceFirst: number,
+): boolean {
+  if (!isScheduledOn(schedule, now.weekday)) return false;
+  const elapsed = minutesOf(now.time) - minutesOf(schedule.time);
+  return (
+    minutesSinceFirst >= REPEAT_AFTER_MINUTES && elapsed > 0 && elapsed <= REPEAT_UNTIL_MINUTES
+  );
 }
 
 export interface DayProgress {

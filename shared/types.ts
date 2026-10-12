@@ -104,6 +104,8 @@ export interface PushPayload {
   body: string;
   tag: string;
   url: string;
+  /** Toca de novo mesmo substituindo um aviso com a mesma `tag` (a repetição do lembrete). */
+  renotify?: boolean;
   /** Presente nos lembretes de dose, para o botão "Tomei" da notificação. */
   dose?: {
     scheduleId: number;

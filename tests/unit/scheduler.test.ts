@@ -61,7 +61,52 @@ describe('lembretes de dose', () => {
     await losartana();
     await tick('08:00');
     await tick('08:01');
+    await tick('08:29');
+    expect(sender.sent).toHaveLength(1);
+  });
+
+  it('lembra de novo meia hora depois se ninguém registrou, e só mais uma vez', async () => {
+    const medicine = await losartana();
+    await tick('08:00');
     await tick('08:30');
+    await tick('08:31');
+    await tick('09:10');
+    expect(titles()).toEqual(['Hora de tomar Losartana', 'Ainda falta tomar Losartana']);
+    // Entra no lugar do primeiro aviso (mesma tag), tocando de novo, e também tem o "Tomei".
+    expect(sender.sent[1]).toMatchObject({
+      tag: sender.sent[0].tag,
+      renotify: true,
+      dose: { scheduleId: medicine.schedules[0].id, date: '2026-10-12' },
+    });
+  });
+
+  it('não repete o lembrete de dose tomada ou pulada', async () => {
+    const medicine = await losartana();
+    await tick('08:00');
+    await store.recordIntake(
+      medicine.schedules[0].id,
+      '2026-10-12',
+      'skipped',
+      at('08:10').toISOString(),
+    );
+    await tick('08:30');
+    await tick('09:00');
+    expect(sender.sent).toHaveLength(1);
+  });
+
+  it('a repetição conta do primeiro lembrete, não do horário da dose', async () => {
+    await losartana();
+    await tick('08:45'); // o servidor voltou atrasado
+    await tick('08:50');
+    expect(sender.sent).toHaveLength(1);
+    await tick('09:15');
+    expect(sender.sent).toHaveLength(2);
+  });
+
+  it('não repete um lembrete velho', async () => {
+    await losartana();
+    await tick('08:00');
+    await tick('10:30');
     expect(sender.sent).toHaveLength(1);
   });
 
