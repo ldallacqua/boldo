@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { CatalogMatch } from '../../shared/catalog';
 import { DOSAGE_UNITS, formatDosage, parseDosage, type DosageUnit } from '../../shared/dosage';
 import { normalizeTags, SUGGESTED_TAGS } from '../../shared/tags';
@@ -137,6 +137,13 @@ export function MedicineForm({
   const [notifyChoice, setNotifyChoice] = useState<boolean | null>(null);
   const notify = notifyChoice ?? (medicine ? alerts.notifies(medicine.id) : true);
 
+  // Remédio novo começa com o cursor no nome. Sem `autoFocus`: ele rolaria o painel, que
+  // ainda está entrando, para dentro da tela de uma vez (veja o foco em Sheet.tsx).
+  const nameField = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!medicine) nameField.current?.focus({ preventScroll: true });
+  }, [medicine]);
+
   // Depois de salvar não há mais o que perder, mesmo com o rascunho ainda diferente do original.
   const [saved, setSaved] = useState(false);
   const dirty = !saved && JSON.stringify(draft) !== initial;
@@ -250,7 +257,7 @@ export function MedicineForm({
           placeholder="Dipirona"
           autoComplete="off"
           required
-          autoFocus={!medicine}
+          ref={nameField}
         />
       </div>
 

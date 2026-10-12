@@ -240,6 +240,15 @@ test('no celular, arrastar o painel para baixo fecha; um puxão curto não', asy
   const medicine = await createMedicine(page, { name: unique(info, 'Arrasta') });
   await page.goto(`/remedios/${medicine.id}`);
   const sheet = page.getByRole('dialog');
+  await expect(sheet.getByRole('link', { name: 'Editar' })).toBeVisible();
+  // O painel ainda está subindo: só depois de pousar o título está onde o dedo vai tocar.
+  await page.evaluate(() =>
+    Promise.all(
+      (document.querySelector('.sheet-panel')?.getAnimations() ?? [])
+        .filter((animation) => animation.timeline === document.timeline)
+        .map((animation) => animation.finished),
+    ),
+  );
   const title = (await sheet.getByRole('heading', { name: medicine.name }).boundingBox())!;
   const x = title.x + title.width / 2;
   const y = title.y + title.height / 2;
@@ -333,4 +342,41 @@ test('cada horário novo sugere uma hora diferente', async ({ page }) => {
   await expect(sheet.getByLabel('Horário 1', { exact: true })).toHaveValue('08:00');
   await expect(sheet.getByLabel('Horário 2', { exact: true })).toHaveValue('20:00');
   await expect(sheet.getByLabel('Horário 3', { exact: true })).toHaveValue('14:00');
+});
+
+test('o painel entra deslizando, do lado de fora até o lugar', async ({ page }, info) => {
+  const medicine = await createMedicine(page, { name: unique(info, 'Desliza') });
+  await page.goto('/remedios');
+  await expect(row(page, medicine.name)).toBeVisible();
+  const wide = (page.viewportSize()?.width ?? 0) >= 720;
+  /** Onde o painel está na tela (borda esquerda ou topo) e quanto o <dialog> rolou. */
+  const sample = () =>
+    page.evaluate((horizontal) => {
+      const panel = document.querySelector('.sheet-panel');
+      const dialog = document.querySelector('.sheet');
+      if (!panel || !dialog) return null;
+      const box = panel.getBoundingClientRect();
+      return {
+        edge: horizontal ? box.left : box.top,
+        scrolled: dialog.scrollLeft + dialog.scrollTop,
+      };
+    }, wide);
+
+  for (const open of [
+    () => row(page, medicine.name).click(),
+    // O formulário novo põe o cursor no nome: o foco não pode puxar o painel para dentro.
+    () => page.getByRole('link', { name: 'Adicionar remédio' }).click(),
+  ]) {
+    await open();
+    await expect.poll(sample).not.toBeNull();
+    const first = (await sample())!;
+    await page.waitForTimeout(700);
+    const settled = (await sample())!;
+    // Começou mais para fora do que termina, e o <dialog> nunca rolou para "ajudar".
+    expect(first.edge).toBeGreaterThan(settled.edge + 20);
+    expect(first.scrolled).toBe(0);
+    expect(settled.scrolled).toBe(0);
+    await page.getByRole('dialog').getByRole('button', { name: 'Fechar' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  }
 });

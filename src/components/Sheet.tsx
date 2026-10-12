@@ -60,7 +60,9 @@ export function Sheet({ title, onClose, onBack, view, unsaved, ref, children }: 
     const element = dialog.current!;
     if (!element.open) element.showModal();
     // Sem isto o navegador foca o primeiro botão e desenha o anel de foco em volta do "fechar".
-    panel.current?.focus();
+    // `preventScroll`: o painel começa fora da tela, e focar algo fora da tela faz o navegador
+    // rolar o <dialog> para mostrá-lo, o que cancela a entrada (ele aparece já no lugar).
+    panel.current?.focus({ preventScroll: true });
     return () => element.close();
   }, []);
 

@@ -962,6 +962,12 @@
   outline: 0;
 }
 
+/* `clip` em vez de `hidden`: o <dialog> não pode rolar nem por código. Um foco em algo que
+   ainda está fora da tela rolaria o painel para dentro de uma vez, sem a entrada. */
+.sheet {
+  overflow: clip;
+}
+
 /* ── Painel: a pergunta antes de descartar o que foi editado ───────────── */
 
 .sheet-pergunta {
