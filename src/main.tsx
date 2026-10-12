@@ -24,13 +24,18 @@ registerSW({ immediate: true });
 
 startTheme();
 
-/** A parte do endereço que escolhe a aba: "", "remedios" ou "ajustes". */
-const tabOf = (path: string) => path.split('/')[1] ?? '';
+/**
+ * A parte do endereço que escolhe a aba: "", "remedios" ou "ajustes". O roteador entrega o
+ * destino já com o prefixo do app (`/boldo/remedios/3`), igual a `location.pathname`.
+ */
+const partsOf = (path: string) => path.slice(APP_BASE.length).split('/').filter(Boolean);
 
-// Trocar de aba anima a página inteira; abrir e fechar um remédio fica por conta do painel.
+// Trocar de aba anima a página inteira. Abrir e fechar um remédio fica por conta do painel,
+// que tem a própria animação: as duas juntas faziam o painel "pipocar" em vez de deslizar.
 const aroundNav: AroundNavHandler = (navigate, to, options) => {
-  const from = window.location.pathname.slice(APP_BASE.length);
-  if (tabOf(from) === tabOf(String(to))) navigate(to, options);
+  const target = partsOf(String(to));
+  const sameTab = (partsOf(window.location.pathname)[0] ?? '') === (target[0] ?? '');
+  if (sameTab || target.length > 1) navigate(to, options);
   else withViewTransition(() => navigate(to, options));
 };
 

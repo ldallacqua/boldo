@@ -184,7 +184,9 @@ Fica em `src/styles/motion.css` (carregado depois de `app.css`), com as duraçõ
 - Só `translate`/`scale`/`opacity` se mexem. Nada nasce de `scale(0)`.
 - **Troca de aba**: View Transitions (`withViewTransition` em `src/lib/motion.ts`, ligado no
   `aroundNav` do roteador em `main.tsx`). A navegação fica parada e a tarja desliza até o
-  item novo. Abrir e fechar um remédio não passa por aí: é o `Sheet` que anima.
+  item novo. Abrir e fechar um remédio não passa por aí: é o `Sheet` que anima (as duas
+  juntas fazem o painel "pipocar"). O destino chega ao `aroundNav` já com o prefixo do app
+  (`/boldo/…`); o teste disso está em `tests/e2e/pages.spec.ts`.
 - **Edição por salvar**: o formulário avisa o painel (`onDirtyChange` → `unsaved`), e o painel
   pergunta antes de fechar, voltar ou ser arrastado. Um remédio aberto pela tela Hoje leva
   `state={{ voltar: '/' }}` no link e volta para ela ao fechar.

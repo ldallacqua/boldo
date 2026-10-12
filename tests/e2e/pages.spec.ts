@@ -122,3 +122,42 @@ test('o service worker assume a subpasta e o app abre sem internet', async ({ br
   await expect(page.getByLabel('Senha')).toBeVisible();
   await context.close();
 });
+
+test('na subpasta, só a troca de aba anima a página; abrir e fechar um remédio não', async ({
+  page,
+}) => {
+  await page.getByRole('link', { name: 'Remédios' }).click();
+  await expect(page.getByRole('heading', { name: 'Remédios' })).toBeVisible();
+  // Conta as transições de página inteira (View Transitions) a partir daqui.
+  await page.evaluate(() => {
+    const original = document.startViewTransition.bind(document);
+    const counter = window as unknown as { transitions: number };
+    counter.transitions = 0;
+    document.startViewTransition = ((update: () => void) => {
+      counter.transitions += 1;
+      return original(update);
+    }) as typeof document.startViewTransition;
+  });
+  const transitions = () =>
+    page.evaluate(() => (window as unknown as { transitions: number }).transitions);
+
+  await page.getByRole('link', { name: 'Adicionar remédio' }).click();
+  const sheet = page.getByRole('dialog');
+  // Sem quantidade o remédio nasce "acabado" e aparece em "Precisa de atenção", mais abaixo.
+  await sheet.getByLabel('Nome').fill('Transição');
+  await sheet.getByRole('button', { name: 'Salvar remédio' }).click();
+  await expect(sheet.getByRole('link', { name: 'Editar' })).toBeVisible();
+  await sheet.getByRole('button', { name: 'Fechar' }).click();
+  await expect(sheet).toHaveCount(0);
+  expect(await transitions()).toBe(0);
+
+  await page.getByRole('link', { name: 'Ajustes' }).click();
+  await expect(page.getByRole('heading', { name: 'Ajustes' })).toBeVisible();
+  expect(await transitions()).toBe(1);
+
+  // Abrir um remédio a partir de outra aba também é só o painel deslizando.
+  await page.getByRole('link', { name: 'Hoje' }).click();
+  await page.getByRole('region', { name: 'Precisa de atenção' }).getByRole('link').first().click();
+  await expect(sheet.getByRole('link', { name: 'Editar' })).toBeVisible();
+  expect(await transitions()).toBe(2);
+});
